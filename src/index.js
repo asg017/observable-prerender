@@ -3,6 +3,9 @@ const path = require("path");
 const querystring = require("querystring");
 const fs = require("fs");
 
+const DEFAULT_WIDTH = 1200;
+const DEFAULT_HEIGHT = Math.floor((DEFAULT_WIDTH * 9) / 16);
+
 class Notebook {
   constructor(browser, page) {
     this.browser = browser;
@@ -15,11 +18,7 @@ class Notebook {
   }
   // inspired by https://observablehq.com/@mbostock/saving-svg
   async svg(cell, path) {
-    await this.page.waitForFunction(
-      (cell) => window.targetStatus.get(cell) === "fulfilled",
-      {},
-      cell
-    );
+    await this.waitFor(cell);
     const html = await this.page.$eval(`#notebook-${cell} > svg`, (e) => {
       const xmlns = "http://www.w3.org/2000/xmlns/";
       const xlinkns = "http://www.w3.org/1999/xlink";
@@ -52,11 +51,7 @@ class Notebook {
     return;
   }
   async screenshot(cell, path) {
-    await this.page.waitForFunction(
-      (cell) => window.targetStatus.get(cell) === "fulfilled",
-      {},
-      cell
-    );
+    await this.waitFor(cell);
     const container = await this.page.$(`#notebook-${cell}`);
     await container.screenshot({ path });
     return;
@@ -64,22 +59,34 @@ class Notebook {
   async waitFor(cell, status = "fulfilled") {
     await this.page.waitForFunction(
       (cell, status) => window.targetStatus.get(cell) === status,
+      {},
       cell,
       status
     );
   }
   async redefine(cell, value) {
-    await this.page.evaluate(
-      (cell, value) => {
-        window.redefine({ [cell]: value });
-      },
-      cell,
-      value
-    );
+    if (typeof cell === "string") {
+      await this.page.evaluate(
+        (cell, value) => {
+          window.redefine({ [cell]: value });
+        },
+        cell,
+        value
+      );
+    } else if (typeof cell === "object") {
+      await this.page.evaluate((cells) => {
+        window.redefine(cells);
+      }, cell);
+    }
   }
 }
 async function load(notebook, targets = [], { browser } = {}) {
-  browser = browser ? browser : await puppeteer.launch();
+  browser = browser
+    ? browser
+    : await puppeteer.launch({
+        defaultViewport: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
+        args: [`--window-size=${DEFAULT_WIDTH},${DEFAULT_HEIGHT}`],
+      });
   const page = await browser.newPage();
   await page.goto(
     `file://${path.join(

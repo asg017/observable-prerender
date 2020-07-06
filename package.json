@@ -4,10 +4,14 @@
   "description": "Programmatically control Observable notebooks with Puppeteer.",
   "main": "src/index.js",
   "license": "MIT",
+  "scripts": {
+    "test": "tape ./tests/**/*.js"
+  },
   "dependencies": {
     "puppeteer": "^5.0.0"
   },
   "devDependencies": {
-    "fs-extra": "^9.0.1"
+    "fs-extra": "^9.0.1",
+    "tape": "^5.0.1"
   }
 }
