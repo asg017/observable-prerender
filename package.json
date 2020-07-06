@@ -24,5 +24,12 @@
   "devDependencies": {
     "fs-extra": "^9.0.1",
     "tape": "^5.0.1"
-  }
+  },
+  "keywords": [
+    "observable",
+    "observablehq",
+    "observable-notebooks",
+    "prerender",
+    "puppeteer"
+  ]
 }

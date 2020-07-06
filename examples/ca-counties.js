@@ -20,6 +20,7 @@ if (!existsSync(OUT_DIR)) {
   for await (let county of counties) {
     console.log(`Doing ${county.name}`);
     await notebook.redefine("county", county.fips);
+    await notebook.waitFor("chart");
     await notebook.screenshot("chart", join(OUT_DIR, `${county.name}.png`));
     await notebook.svg("chart", join(OUT_DIR, `${county.name}.svg`));
   }

@@ -31,7 +31,8 @@ await notebook.screenshot("chart", "bar-chart.png");
 await notebook.browser.close();
 ```
 
-TODO add resulting bar chart
+Result:
+![Screenshot of a bar chart with 3 bars, with labels "alex", "brian" and "craig", with values 20, 30, and 10, respectively.](https://user-images.githubusercontent.com/15178711/86563267-ee847580-bf18-11ea-9b58-8c5ee6d710f4.png)
 
 ### Create a map of every county in California
 
@@ -50,7 +51,14 @@ for await (let county of counties) {
 await notebook.browser.close();
 ```
 
-TODO Add few county screenshots
+Some of the resulting PNGs:
+
+| County      | Screenshot                                                                                                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Los Angeles | ![](https://user-images.githubusercontent.com/15178711/86563356-15db4280-bf19-11ea-86e2-664c64a1593a.png)                                              |
+| Merced      | ![Picture of a simple map of Merced county.](https://user-images.githubusercontent.com/15178711/86563375-1e337d80-bf19-11ea-9bc9-03517bb82bab.png)     |
+| Sacramento  | ![Picture of a simple map of Sacramento county.](https://user-images.githubusercontent.com/15178711/86563392-25f32200-bf19-11ea-9c96-54e394012585.png) |
+| San Diego   | ![Picture of a simple map of Merced county.](https://user-images.githubusercontent.com/15178711/86563413-2ee3f380-bf19-11ea-87c3-5fd08ad0861d.png)     |
 
 ### Create frames for an animated GIF
 
@@ -77,7 +85,9 @@ Then use something like ffmpeg to create a MP4 video with those frames!
  ffmpeg.exe -framerate 30 -i sun%03d.png -c:v libx264  -pix_fmt yuv420p out.mp4
 ```
 
-TODO add resulting video ![]()
+Result (as a GIF, since GitHub only supports gifs):
+
+![Screencast of a animation of sunlight time in Los Angeles during the year.](https://user-images.githubusercontent.com/15178711/86563817-ed077d00-bf19-11ea-9922-52ef0fd5c38d.gif)
 
 ## Install
 
