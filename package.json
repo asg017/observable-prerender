@@ -1,0 +1,13 @@
+{
+  "name": "puppeteer-test",
+  "version": "0.0.0",
+  "description": "Programmatically control Observable notebooks with Puppeteer.",
+  "main": "src/index.js",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^5.0.0"
+  },
+  "devDependencies": {
+    "fs-extra": "^9.0.1"
+  }
+}
