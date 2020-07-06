@@ -74,7 +74,7 @@ await notebook.browser.close();
 Then use something like ffmpeg to create a MP4 video with those frames!
 
 ```bash
-ffmpeg -r 1/5 -i sun%03d.png -c:v libx264 -vf fps=25 -pix_fmt yuv420p out.mp4
+ ffmpeg.exe -framerate 30 -i sun%03d.png -c:v libx264  -pix_fmt yuv420p out.mp4
 ```
 
 TODO add resulting video ![]()
