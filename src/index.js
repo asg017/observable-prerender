@@ -50,10 +50,10 @@ class Notebook {
     );
     return;
   }
-  async screenshot(cell, path) {
+  async screenshot(cell, path, options = {}) {
     await this.waitFor(cell);
     const container = await this.page.$(`#notebook-${cell}`);
-    await container.screenshot({ path });
+    await container.screenshot({ path, ...options });
     return;
   }
   async waitFor(cell, status = "fulfilled") {

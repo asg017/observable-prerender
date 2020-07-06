@@ -17,9 +17,6 @@ if (!existsSync(OUT_DIR)) {
     ["chart"]
   );
   const counties = await notebook.value("counties");
-  /*notebook.page.evaluate(() => {
-    window.notebookModule._scope.get("viewof county").delete();
-  });//*/
   for await (let county of counties) {
     console.log(`Doing ${county.name}`);
     await notebook.redefine("county", county.fips);

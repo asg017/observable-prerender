@@ -18,10 +18,13 @@ if (!existsSync(OUT_DIR)) {
   ]);
   const times = await notebook.value("times");
   for (let i = 0; i < times.length; i++) {
-    console.log(i);
+    console.log(`${i}/${times.length}`);
     await notebook.redefine("timeI", i);
     await notebook.waitFor("controller");
-    await notebook.screenshot("graphic", join(OUT_DIR, `sun${i}.png`));
+    await notebook.screenshot(
+      "graphic",
+      join(OUT_DIR, `sun${("000" + i).slice(-3)}.png`)
+    );
   }
   await notebook.browser.close();
 })();
