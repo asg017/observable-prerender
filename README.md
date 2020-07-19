@@ -100,11 +100,18 @@ Although not required, a solid understanding of the Observable notebook runtime 
 - [How Observable Runs from Observable](https://observablehq.com/@observablehq/how-observable-runs)
 - [Downloading and Embedding Notebooks from Observable](https://observablehq.com/@observablehq/downloading-and-embedding-notebooks)
 
-### prerender.**load**(notebook, _targets_)
+### prerender.**load**(notebook, _targets_, _config_)
 
 Load the given notebook into a page in a browser. `notebook` is the id of the notebook on observablehq.com, like `@d3/bar-chart` or `@asg017/bitmoji`. For unlisted notebooks, be sure to include the `d/` prefix (e.g. `d/27a0b05d777304bd`). `targets` is an array of cell names that will be evaluated. Every cell in `targets` (and the cells they depend on) will be evaluated and render to the page's DOM. If not supplied, then all cells (including anonymous ones) will be evaluated by default.
 
-This returns a Notebook object. A Notebook has `page` and `browser` properties, which are the Puppeteer page and browser objects that the notebook is loaded with. This gives a lower-level API to the underlying Puppeteer objects that render the notebook, in case you want more fine-grain API access for more control.
+`config` is an object with key/values for more control over how to load the notebook.
+
+| Key                    | Value                                                                                                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `browser`              | Supply a Puppeteer Browser object instead of creating a new one. Good for `headless:false` debugging.                                                                                                                                                                          |
+| `OBSERVABLEHQ_API_KEY` | Supply an [ObservableHQ API Key](https://observablehq.com/@observablehq/api-keys) to load in private notebooks. NOTE: This library uses the api_key URL query parameter to supply the key to Observable, which according to their guide, is meant for testing and development. |
+
+`.load()` returns a Notebook object. A Notebook has `page` and `browser` properties, which are the Puppeteer page and browser objects that the notebook is loaded with. This gives a lower-level API to the underlying Puppeteer objects that render the notebook, in case you want more fine-grain API access for more control.
 
 ### notebook.**value**(cell)
 
