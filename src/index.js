@@ -80,7 +80,11 @@ class Notebook {
     }
   }
 }
-async function load(notebook, targets = [], { browser } = {}) {
+async function load(
+  notebook,
+  targets = [],
+  { browser, OBSERVABLEHQ_API_KEY } = {}
+) {
   browser = browser
     ? browser
     : await puppeteer.launch({
@@ -96,6 +100,7 @@ async function load(notebook, targets = [], { browser } = {}) {
     )}?${querystring.encode({
       notebook,
       targets: targets.length > 0 ? targets.join(",") : undefined,
+      OBSERVABLEHQ_API_KEY,
     })}`
   );
 

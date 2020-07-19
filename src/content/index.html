@@ -30,6 +30,9 @@
       const targets = params.has("targets")
         ? params.get("targets").split(",")
         : [];
+      const OBSERVABLEHQ_API_KEY = params.has("OBSERVABLEHQ_API_KEY")
+        ? params.get("OBSERVABLEHQ_API_KEY")
+        : null;
       let observer;
 
       if (targets.length > 0) {
@@ -57,20 +60,21 @@
       } else {
         observer = Inspector.into(document.body);
       }
+      const notebookLink = `https://api.observablehq.com/${notebook}.js?v=3${
+        OBSERVABLEHQ_API_KEY ? `&api_key=${OBSERVABLEHQ_API_KEY}` : ""
+      }`;
 
-      import(`https://api.observablehq.com/${notebook}.js?v=3`).then(
-        async ({ default: define }) => {
-          window.rt = new Runtime();
-          const o = observer;
-          const m = window.rt.module(define, o);
-          window.notebookModule = m;
-          window.redefine = (redefine) => {
-            for (let cell in redefine) {
-              m.redefine(cell, redefine[cell]);
-            }
-          };
-        }
-      );
+      import(notebookLink).then(async ({ default: define }) => {
+        window.rt = new Runtime();
+        const o = observer;
+        const m = window.rt.module(define, o);
+        window.notebookModule = m;
+        window.redefine = (redefine) => {
+          for (let cell in redefine) {
+            m.redefine(cell, redefine[cell]);
+          }
+        };
+      });
     }
   </script>
 </body>
