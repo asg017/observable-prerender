@@ -23,7 +23,10 @@ if (!existsSync(OUT_DIR)) {
   for (let i = 0; i < dates.length; i++) {
     console.log(i);
     await notebook.redefine("index", i);
-    await notebook.screenshot("map", join(OUT_DIR, `${i}.png`));
+    await notebook.screenshot(
+      "map",
+      join(OUT_DIR, `${("000" + i).slice(-3)}.png`)
+    );
   }
   await notebook.browser.close();
 })();

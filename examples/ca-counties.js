@@ -14,8 +14,10 @@ if (!existsSync(OUT_DIR)) {
 (async function () {
   const notebook = await load(
     "@datadesk/base-maps-for-all-58-california-counties",
-    ["chart"]
+    ["chart", "viewof county"]
   );
+  notebook.waitFor("chart");
+  throw Error();
   const counties = await notebook.value("counties");
   for await (let county of counties) {
     console.log(`Doing ${county.name}`);

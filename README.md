@@ -32,7 +32,7 @@ await notebook.browser.close();
 ```
 
 Result:
-![Screenshot of a bar chart with 3 bars, with labels "alex", "brian" and "craig", with values 20, 30, and 10, respectively.](https://user-images.githubusercontent.com/15178711/86563267-ee847580-bf18-11ea-9b58-8c5ee6d710f4.png)
+<img alt="Screenshot of a bar chart with 3 bars, with labels alex, brian and craig, with values 20, 30, and 10, respectively." src="https://user-images.githubusercontent.com/15178711/86563267-ee847580-bf18-11ea-9b58-8c5ee6d710f4.png" width="500">
 
 ### Create a map of every county in California
 
@@ -53,12 +53,10 @@ await notebook.browser.close();
 
 Some of the resulting PNGs:
 
-| County      | Screenshot                                                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Los Angeles | ![](https://user-images.githubusercontent.com/15178711/86563356-15db4280-bf19-11ea-86e2-664c64a1593a.png)                                              |
-| Merced      | ![Picture of a simple map of Merced county.](https://user-images.githubusercontent.com/15178711/86563375-1e337d80-bf19-11ea-9bc9-03517bb82bab.png)     |
-| Sacramento  | ![Picture of a simple map of Sacramento county.](https://user-images.githubusercontent.com/15178711/86563392-25f32200-bf19-11ea-9c96-54e394012585.png) |
-| San Diego   | ![Picture of a simple map of Merced county.](https://user-images.githubusercontent.com/15178711/86563413-2ee3f380-bf19-11ea-87c3-5fd08ad0861d.png)     |
+| -                                                                                                                                                                                  | -                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img alt="Picture of a simple map of Los Angeles county." src="https://user-images.githubusercontent.com/15178711/86563356-15db4280-bf19-11ea-86e2-664c64a1593a.png" width="400"/> | <img alt="Picture of a simple map of Merced county." src="https://user-images.githubusercontent.com/15178711/86563375-1e337d80-bf19-11ea-9bc9-03517bb82bab.png" width="400">     |
+| <img alt="Picture of a simple map of Sacramento county." src="https://user-images.githubusercontent.com/15178711/86563392-25f32200-bf19-11ea-9c96-54e394012585.png" width="400">   | <img alt="Picture of a simple map of San Diegoo county." src="https://user-images.githubusercontent.com/15178711/86563413-2ee3f380-bf19-11ea-87c3-5fd08ad0861d.png" width="400"> |
 
 ### Create frames for an animated GIF
 
@@ -87,7 +85,7 @@ Then use something like ffmpeg to create a MP4 video with those frames!
 
 Result (as a GIF, since GitHub only supports gifs):
 
-![Screencast of a animation of sunlight time in Los Angeles during the year.](https://user-images.githubusercontent.com/15178711/86563817-ed077d00-bf19-11ea-9922-52ef0fd5c38d.gif)
+<img alt="Screencast of a animation of sunlight time in Los Angeles during the year." src="https://user-images.githubusercontent.com/15178711/86563817-ed077d00-bf19-11ea-9922-52ef0fd5c38d.gif" width="500"/>
 
 ## Install
 
@@ -132,6 +130,20 @@ If `cell` is a SVG cell, this will save that cell's SVG into `path`, like `.scre
 
 Returns a Promise that resolves when the cell named `cell` is `"fulfilled"` (see the Observable inspector documentation for more details). The default is fulfilled, but `status` could also be `"pending"` or `"rejected"`. Use this function to ensure that youre redefined changes propagate to dependent cells.
 
-## A Note on Serialization
+## Caveats
+
+### Beta
+
+This library is mostly a proof of concept, and probably will change in the future. Follow Issue #2 to know when the stable v1 library will be complete. As always, feedback, bug reports, and ideas will make v1 even better!
+
+### Serialization
 
 There is a Puppeteer serialization process when switching from browser JS data to Node. Returning primitives like arrays, plain JS objects, numbers, and strings will work fine, but custom objects, HTML elements, Date objects, and some typed arrays may not. Which means that some methods like `.value()` or `.redefine()` may be limited or may not work as expected, causing subtle bugs. Check out the [Puppeteer docs](https://pptr.dev/#?product=Puppeteer&version=v3.1.0&show=api-pageevaluatepagefunction-args) for more info about this.
+
+### Animation is hard
+
+You won't be able to make neat screencasts from all Observable notebooks. Puppeteer doesn't support taking a video recording of a browser, so instead, the suggested method is to take several PNG screenshots, then stitch them all together into a gif/mp4 using ffmpeg or some other service.
+
+So what should you screenshot, exactly? It depends on your notebook. You probably need to have some counter/index/pointer that changes the graph when updated (see [scrubber](https://observablehq.com/@mbostock/scrubber)). You can programmatically redefine that cell using `notebook.redefine` in some loop, then screenshot the graph once the changes propagate (`notebook.waitFor`). But keep in mind, this may work for JS transitions, but CSS animations may not render properly or in time, so it really depends on how you built your notebook. it's super hard to get it right without some real digging.
+
+If you run into any issues getting frames for a animation, feel free to open an issue!

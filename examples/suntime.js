@@ -16,6 +16,7 @@ if (!existsSync(OUT_DIR)) {
     "graphic",
     "controller",
   ]);
+  notebook.redefine({ coordinates: [-51.42, -57.51] });
   const times = await notebook.value("times");
   for (let i = 0; i < times.length; i++) {
     console.log(`${i}/${times.length}`);
