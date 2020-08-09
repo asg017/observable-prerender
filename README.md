@@ -20,15 +20,17 @@ Check out `examples/` for workable code.
 
 ```javascript
 const { load } = require("@alex.garcia/observable-prerender");
-const notebook = await load("@d3/bar-chart", ["chart", "data"]);
-const data = [
-  { name: "alex", value: 20 },
-  { name: "brian", value: 30 },
-  { name: "craig", value: 10 },
-];
-await notebook.redefine("data", data);
-await notebook.screenshot("chart", "bar-chart.png");
-await notebook.browser.close();
+(async () => {
+  const notebook = await load("@d3/bar-chart", ["chart", "data"]);
+  const data = [
+    { name: "alex", value: 20 },
+    { name: "brian", value: 30 },
+    { name: "craig", value: 10 },
+  ];
+  await notebook.redefine("data", data);
+  await notebook.screenshot("chart", "bar-chart.png");
+  await notebook.browser.close();
+})();
 ```
 
 Result:
@@ -38,17 +40,19 @@ Result:
 
 ```javascript
 const { load } = require("@alex.garcia/observable-prerender");
-const notebook = await load(
-  "@datadesk/base-maps-for-all-58-california-counties",
-  ["chart"]
-);
-const counties = await notebook.value("counties");
-for await (let county of counties) {
-  await notebook.redefine("county", county.fips);
-  await notebook.screenshot("chart", `${county.name}.png`);
-  await notebook.svg("chart", `${county.name}.svg`);
-}
-await notebook.browser.close();
+(async () => {
+  const notebook = await load(
+    "@datadesk/base-maps-for-all-58-california-counties",
+    ["chart"]
+  );
+  const counties = await notebook.value("counties");
+  for await (let county of counties) {
+    await notebook.redefine("county", county.fips);
+    await notebook.screenshot("chart", `${county.name}.png`);
+    await notebook.svg("chart", `${county.name}.svg`);
+  }
+  await notebook.browser.close();
+})();
 ```
 
 Some of the resulting PNGs:
@@ -64,17 +68,19 @@ Create PNG frames with `observable-prerender`:
 
 ```javascript
 const { load } = require("@alex.garcia/observable-prerender");
-const notebook = await load("@asg017/sunrise-and-sunset-worldwide", [
-  "graphic",
-  "controller",
-]);
-const times = await notebook.value("times");
-for (let i = 0; i < times.length; i++) {
-  await notebook.redefine("timeI", i);
-  await notebook.waitFor("controller");
-  await notebook.screenshot("graphic", `sun${i}.png`);
-}
-await notebook.browser.close();
+(async () => {
+  const notebook = await load("@asg017/sunrise-and-sunset-worldwide", [
+    "graphic",
+    "controller",
+  ]);
+  const times = await notebook.value("times");
+  for (let i = 0; i < times.length; i++) {
+    await notebook.redefine("timeI", i);
+    await notebook.waitFor("controller");
+    await notebook.screenshot("graphic", `sun${i}.png`);
+  }
+  await notebook.browser.close();
+})();
 ```
 
 Then use something like ffmpeg to create a MP4 video with those frames!
@@ -86,6 +92,36 @@ Then use something like ffmpeg to create a MP4 video with those frames!
 Result (as a GIF, since GitHub only supports gifs):
 
 <img alt="Screencast of a animation of sunlight time in Los Angeles during the year." src="https://user-images.githubusercontent.com/15178711/86563817-ed077d00-bf19-11ea-9922-52ef0fd5c38d.gif" width="500"/>
+
+### Working with `puppeteer-cluster`
+
+You can pass in raw Puppeteer `browser`/`page` objects into `load()`, which works really well with 3rd party Puppeteer tools like `puppeteer-cluster`. Here's an example where we have a cluster of Puppeteer workers that take screenshots of the `chart` cells of various D3 examples:
+
+```js
+const { Cluster } = require("puppeteer-cluster");
+const { load } = require("@alex.garcia/observable-prerender");
+
+(async () => {
+  const cluster = await Cluster.launch({
+    concurrency: Cluster.CONCURRENCY_CONTEXT,
+    maxConcurrency: 2,
+  });
+
+  await cluster.task(async ({ page, data: notebookId }) => {
+    const notebook = await load(notebookId, ["chart"], { page });
+    await notebook.screenshot("chart", `${notebookId}.png`.replace("/", "_"));
+  });
+
+  cluster.queue("@d3/bar-chart");
+  cluster.queue("@d3/line-chart");
+  cluster.queue("@d3/directed-chord-diagram");
+  cluster.queue("@d3/spike-map");
+  cluster.queue("@d3/fan-chart");
+
+  await cluster.idle();
+  await cluster.close();
+})();
+```
 
 ## Install
 
@@ -109,6 +145,7 @@ Load the given notebook into a page in a browser. `notebook` is the id of the no
 | Key                    | Value                                                                                                                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `browser`              | Supply a Puppeteer Browser object instead of creating a new one. Good for `headless:false` debugging.                                                                                                                                                                          |
+| `page`                 | Supply a Puppeteer Page object instead of creating a new browser or page. Good for use in something like [`puppeteer-cluster`](https://github.com/thomasdondorf/puppeteer-cluster)                                                                                             |
 | `OBSERVABLEHQ_API_KEY` | Supply an [ObservableHQ API Key](https://observablehq.com/@observablehq/api-keys) to load in private notebooks. NOTE: This library uses the api_key URL query parameter to supply the key to Observable, which according to their guide, is meant for testing and development. |
 
 `.load()` returns a Notebook object. A Notebook has `page` and `browser` properties, which are the Puppeteer page and browser objects that the notebook is loaded with. This gives a lower-level API to the underlying Puppeteer objects that render the notebook, in case you want more fine-grain API access for more control.
@@ -127,7 +164,7 @@ Keep in mind that the value return is serialized from the browser to Node, see b
 
 ### notebook.**screenshot**(cell, path, _options_)
 
-Take a screenshot of the container of the element that contains the rendered value of `cell`. `path` is the path of the saved screenshot (PNG), and `options` is any extra options that get added to the underlying Puppeteer `.screenshot()` function ([list of options here](https://pptr.dev/#?product=Puppeteer&version=v5.0.0&show=api-pagescreenshotoptions)). For example, if the `@d3/bar-chart` notebook is loaded, `notebook.screenshot('chart)
+Take a screenshot of the container of the element that contains the rendered value of `cell`. `path` is the path of the saved screenshot (PNG), and `options` is any extra options that get added to the underlying Puppeteer `.screenshot()` function ([list of options here](https://pptr.dev/#?product=Puppeteer&version=v5.0.0&show=api-pagescreenshotoptions)). For example, if the `@d3/bar-chart` notebook is loaded, `notebook.screenshot('chart')`
 
 ### notebook.**svg**(cell, path)
 

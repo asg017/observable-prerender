@@ -83,15 +83,19 @@ class Notebook {
 async function load(
   notebook,
   targets = [],
-  { browser, OBSERVABLEHQ_API_KEY } = {}
+  { browser, page, OBSERVABLEHQ_API_KEY } = {}
 ) {
-  browser = browser
-    ? browser
-    : await puppeteer.launch({
-        defaultViewport: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
-        args: [`--window-size=${DEFAULT_WIDTH},${DEFAULT_HEIGHT}`],
-      });
-  const page = await browser.newPage();
+  if (!browser) {
+    browser = page
+      ? page.browser()
+      : await puppeteer.launch({
+          defaultViewport: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
+          args: [`--window-size=${DEFAULT_WIDTH},${DEFAULT_HEIGHT}`],
+        });
+  }
+  if (!page) {
+    page = await browser.newPage();
+  }
   await page.goto(
     `file://${path.join(
       __dirname,
