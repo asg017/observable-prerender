@@ -25,6 +25,7 @@
     } from "https://cdn.jsdelivr.net/npm/@observablehq/runtime@4.6/dist/runtime.js";
 
     const params = new URLSearchParams(window.location.search);
+
     if (params.has("notebook")) {
       const notebook = params.get("notebook");
       const targets = params.has("targets")
@@ -35,6 +36,7 @@
         : null;
       let observer;
 
+      // only embed specific cells.
       if (targets.length > 0) {
         const targetSet = new Set(targets);
         observer = (name) => {
@@ -57,7 +59,9 @@
             },
           };
         };
-      } else {
+      } 
+      // embed entire notebook, no regard 
+      else {
         observer = Inspector.into(document.body);
       }
       const notebookLink = `https://api.observablehq.com/${notebook}.js?v=3${
@@ -73,6 +77,12 @@
           for (let cell in redefine) {
             m.redefine(cell, redefine[cell]);
           }
+        };
+        window.redefineFileAttachments = (files) => {
+          const fa = new Map(files);
+          console.log(fa);
+          window.notebookModule
+            .redefine('FileAttachment', [], () => window.rt.fileAttachments(name=>fa.get(name)));
         };
       });
     }

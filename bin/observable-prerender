@@ -1,0 +1,174 @@
+#!/usr/bin/env node
+const { program } = require("commander");
+const { load, DEFAULT_WIDTH, DEFAULT_HEIGHT } = require("../src");
+const {
+  parseArgRedefines,
+  parseArgRedefineFiles,
+  valueOfFile,
+} = require("./utils.js");
+const { join, isAbsolute } = require("path");
+
+program
+  .version(require("../package.json").version)
+  .arguments("<notebook> [cells...]")
+  .description("Pre-render an Observable notebook.")
+  .option("--redefine <cell:value...>", "Redefine a cell (string only)")
+  .option(
+    "--redefine-file <cell:<string,json,ndjson,csv>:value...>",
+    "Redefine a cell with a file"
+  )
+  .option(
+    "--file-attachments <file attachment:path...>",
+    "Redefine a file attachment with a local file"
+  )
+  .option("-f, --format [format]", "Type of output, png, jpeg, or svg", null)
+  .option(
+    "-o, --out [file]",
+    "Output file path. Can only be used when one cell name is passed into 'cells'."
+  )
+  .option(
+    "--out-dir <directory>",
+    "Specify a directory to save all the frames to."
+  )
+  .option(
+    "--token <token>",
+    "An observablehq.com API token to access the notebook."
+  )
+  .option(
+    "--no-headless",
+    "Turn off headless mode on the Puppeteer browser, meaning open the browser to the user."
+  )
+  .option(
+    "-w, --width <value>",
+    `Width of the Puppeteer browser. Default ${DEFAULT_WIDTH}`
+  )
+  .option(
+    "-h, --height <value>",
+    `Height of th Puppeteer browser. Default ${DEFAULT_HEIGHT}`
+  )
+  .option("-q, --quiet", "Don't print out logs")
+  .action(function (argNotebook, argCells) {
+    const opts = program.opts();
+    const {
+      version,
+      redefine = [],
+      redefineFile = [],
+      fileAttachments = [],
+      out,
+      token,
+      outDir,
+      headless,
+      quiet,
+    } = opts;
+
+    let { width, height, format } = opts;
+
+    if (width) width = +width;
+    if (height) height = +height;
+
+    if (out && argCells.length > 1) {
+      console.error(
+        `Only 1 cell could be passed into 'cells' when '--out' is specified. ${argCells.length} were passed in.`
+      );
+      process.exit(1);
+    }
+
+    if (out && outDir) {
+      console.error(`Only 1 of --out and --out-dir can be specified.`);
+      process.exit(1);
+    }
+
+    if (out) {
+      const outFileFormat = out.substring(out.lastIndexOf(".") + 1);
+      if (["png", "svg", "jpeg"].includes(outFileFormat)) {
+        format = outFileFormat;
+      } else {
+        console.error(
+          `Uknown file type "${outFileFormat}" passed in for --out parameter. Have the path end in .svg, .png, or .jpeg, or use the --format flag.`
+        );
+        process.exit(1);
+      }
+    } else {
+      if (!format) format = "svg";
+    }
+
+    const redefines = parseArgRedefines(redefine);
+    const redefineFiles = parseArgRedefineFiles(redefineFile);
+    const redefineFileAttachments = parseArgRedefines(fileAttachments);
+
+    const config = {
+      width,
+      height,
+      headless,
+    };
+    if (token) config["OBSERVABLEHQ_API_KEY"] = token;
+
+    if (!quiet)
+      console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
+    load(argNotebook, argCells, config).then(async (notebook) => {
+      if (redefines.length > 0) {
+        for (const { cell, value, format } of redefines) {
+          if (!quiet) console.log("Redefining ", cell, "with format ", format);
+          const val = format === "number" ? +value : value;
+          notebook.redefine(cell, val);
+        }
+      }
+
+      if (redefines.length > 0) {
+        for await (const {
+          cell,
+          value,
+          format: redefineFileFormat,
+        } of redefineFiles) {
+          if (!quiet)
+            console.log(
+              "Redefining ",
+              cell,
+              " with file ",
+              value,
+              " with format ",
+              redefineFileFormat
+            );
+          const data = await valueOfFile(value, redefineFileFormat);
+          notebook.redefine(cell, data);
+        }
+      }
+      if (redefineFileAttachments.length > 0) {
+        const files = {};
+        for (const { cell, value } of redefineFileAttachments) {
+          if (!quiet)
+            console.log(
+              "Replacing FileAttachment ",
+              cell,
+              " with file ",
+              value
+            );
+          files[cell] = isAbsolute(value) ? value : join(process.cwd(), value);
+        }
+
+        await notebook.fileAttachments(files);
+      }
+
+      await Promise.all(
+        argCells.map((cell) => {
+          const path = out
+            ? out
+            : join(outDir || process.cwd(), `${cell}.${format}`);
+          if (!quiet)
+            console.log(
+              "Saving cell ",
+              cell,
+              " as a ",
+              format,
+              " at file ",
+              path
+            );
+          if (format === "svg") return notebook.svg(cell, path);
+          return notebook.screenshot(cell, path, { type: format });
+        })
+      );
+      notebook.browser.close();
+    });
+  });
+
+program.parse(process.argv);

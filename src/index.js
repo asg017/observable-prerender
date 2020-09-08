@@ -53,8 +53,7 @@ class Notebook {
   async screenshot(cell, path, options = {}) {
     await this.waitFor(cell);
     const container = await this.page.$(`#notebook-${cell}`);
-    await container.screenshot({ path, ...options });
-    return;
+    return await container.screenshot({ path, ...options });
   }
   async waitFor(cell, status = "fulfilled") {
     await this.page.waitForFunction(
@@ -63,6 +62,48 @@ class Notebook {
       cell,
       status
     );
+  }
+
+  // arg files is an object where keys are the file attachment names
+  // to override, and values are the (hopefully absolute) path to the
+  // local file to replace with.
+  async fileAttachments(files = {}) {
+    const filesArr = [];
+    for (const key in files) {
+      filesArr.push([key, files[key]]);
+    }
+    const filePaths = Object.values(files);
+
+    await this.page.exposeFunction("readfile", async (filePath) => {
+      return new Promise((resolve, reject) => {
+        if (!filePaths.includes(filePath)) {
+          return reject(
+            `Only files exposed in the .fileAttachments argument can be exposed.`
+          );
+        }
+        fs.readFile(filePath, "utf8", (err, text) => {
+          if (err) reject(err);
+          else resolve(text);
+        });
+      });
+    });
+
+    await this.page.evaluate(async (files) => {
+      const fa = new Map(
+        await Promise.all(
+          Object.keys(files).map(async (name) => {
+            const file = files[name];
+            const content = await window.readfile(file);
+            const url = window.URL.createObjectURL(new Blob([content]));
+            return [name, url];
+          })
+        )
+      );
+
+      window.notebookModule.redefine("FileAttachment", [], () =>
+        window.rt.fileAttachments((name) => fa.get(name))
+      );
+    }, files);
   }
   async redefine(cell, value) {
     if (typeof cell === "string") {
@@ -80,17 +121,23 @@ class Notebook {
     }
   }
 }
-async function load(
-  notebook,
-  targets = [],
-  { browser, page, OBSERVABLEHQ_API_KEY } = {}
-) {
+async function load(notebook, targets = [], config = {}) {
+  // width, height, headless
+  let {
+    browser,
+    page,
+    OBSERVABLEHQ_API_KEY,
+    headless = true,
+    width = DEFAULT_WIDTH,
+    height = DEFAULT_HEIGHT,
+  } = config;
   if (!browser) {
     browser = page
       ? page.browser()
       : await puppeteer.launch({
-          defaultViewport: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
-          args: [`--window-size=${DEFAULT_WIDTH},${DEFAULT_HEIGHT}`],
+          defaultViewport: { width, height },
+          args: [`--window-size=${width},${height}`],
+          headless,
         });
   }
   if (!page) {
@@ -113,4 +160,4 @@ async function load(
   return new Notebook(browser, page);
 }
 
-module.exports = { load };
+module.exports = { load, DEFAULT_WIDTH, DEFAULT_HEIGHT };

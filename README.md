@@ -123,6 +123,10 @@ const { load } = require("@alex.garcia/observable-prerender");
 })();
 ```
 
+### The `observable-prerender` CLI
+
+Check out the `/cli-examples` directory for bash scripts that show off the different arguments of the bundled CLI programs.
+
 ## Install
 
 ```bash
@@ -147,6 +151,9 @@ Load the given notebook into a page in a browser. `notebook` is the id of the no
 | `browser`              | Supply a Puppeteer Browser object instead of creating a new one. Good for `headless:false` debugging.                                                                                                                                                                          |
 | `page`                 | Supply a Puppeteer Page object instead of creating a new browser or page. Good for use in something like [`puppeteer-cluster`](https://github.com/thomasdondorf/puppeteer-cluster)                                                                                             |
 | `OBSERVABLEHQ_API_KEY` | Supply an [ObservableHQ API Key](https://observablehq.com/@observablehq/api-keys) to load in private notebooks. NOTE: This library uses the api_key URL query parameter to supply the key to Observable, which according to their guide, is meant for testing and development. |
+| `height`               | Number, height of the Puppeteer browser that will be created. If `browser` is also passed, this will be ignored. Default `675`.                                                                                                                                                |
+| `width`                | Number, idth of the Puppeteer browser that will be created. If `browser` is also passed, this will be ignored. Default `1200`.                                                                                                                                                 |
+| `headless`             | Boolean, whether the Puppeteer browser should be "headless" or not. great for debugging. Default `true`.                                                                                                                                                                       |
 
 `.load()` returns a Notebook object. A Notebook has `page` and `browser` properties, which are the Puppeteer page and browser objects that the notebook is loaded with. This gives a lower-level API to the underlying Puppeteer objects that render the notebook, in case you want more fine-grain API access for more control.
 
@@ -173,6 +180,27 @@ If `cell` is a SVG cell, this will save that cell's SVG into `path`, like `.scre
 ### notebook.**waitFor**(cell, _status_)
 
 Returns a Promise that resolves when the cell named `cell` is `"fulfilled"` (see the Observable inspector documentation for more details). The default is fulfilled, but `status` could also be `"pending"` or `"rejected"`. Use this function to ensure that youre redefined changes propagate to dependent cells.
+
+### notebook.**fileAttachments**(files)
+
+Replace the [FileAttachments](https://observablehq.com/@observablehq/file-attachments) of the notebook with those defined in `files`. `files` is an object where the keys are the names of the FileAttachment, and the values are the absolute paths to the files that will replace the FileAttachments.
+
+## CLI Reference
+
+`observable-prerender` also comes bundled with 2 CLI programs, `observable-prerender` and `observable-prerender-animate`, that allow you to more quickly pre-render notebooks and integrate with local files and other CLI tools.
+
+### `observable-prerender [options] <notebook> [cells...]`
+
+Pre-render the given notebook and take screenshots of the given cells. `<notebook>` is the observablehq.com ID of the notebook to load, same argument as the 1st argument in `.load()`. `[cells...]` is the list of cells that will be screenshotted from the notebook. By default, the screenshots will be saved as `<cell_name>.<format>` in the current directory.
+
+Run `observable-prerender --help` to get a full list of options.
+
+### `observable-prerender-animate [options] <notebook> [cells...] --iter cell:cellIterator`
+
+Pre-render the given notebook, iterate through the values of the `cellIterator` cell on the `cell` cell, and take screenshots of the argument cells. `<notebook>` is the observablehq.com ID of the notebook to load, same argument as the 1st argument in `.load()`. `[cells...]` is the list of cells that will be screenshotted from the notebook. `--iter` is the only required option, in the format of `cell:cellIterator`, where `cell` is the cell that will change on every loop, and `cellIterator` will be the cell that contains all the values.
+
+Run `observable-prerender-animate --help` to get a full list of options.
+
 
 ## Caveats
 
