@@ -73,16 +73,18 @@ program
       redefine = [],
       redefineFile = [],
       fileAttachments = [],
-      format,
       iter,
       iterWaitfor = [],
       outDir,
       token,
-      width,
-      height,
       headless,
+      quiet,
     } = opts;
-    let { width, height, format } = opts;
+    let width, height, format;
+
+    width = opts.width;
+    height = opts.height;
+    format = opts.format;
 
     if (width) width = +width;
     if (height) height = +height;

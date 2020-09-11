@@ -83,10 +83,12 @@ program
       if (["png", "svg", "jpeg"].includes(outFileFormat)) {
         format = outFileFormat;
       } else {
-        console.error(
-          `Uknown file type "${outFileFormat}" passed in for --out parameter. Have the path end in .svg, .png, or .jpeg, or use the --format flag.`
-        );
-        process.exit(1);
+        if (!format) {
+          console.error(
+            `Unknown file type "${outFileFormat}" passed in for --out parameter. Have the path end in .svg, .png, or .jpeg, or use the --format flag.`
+          );
+          process.exit(1);
+        }
       }
     } else {
       if (!format) format = "svg";
