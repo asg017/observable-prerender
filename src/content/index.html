@@ -9,7 +9,7 @@
     type="text/css"
     href="https://cdn.jsdelivr.net/npm/@observablehq/inspector@3/dist/inspector.css"
   />
-  <title>Observable Notebook Basic Host</title>
+  <title>observable-prerender</title>
 </head>
 
 <body>
@@ -17,6 +17,9 @@
     window.targetStatus = new Map();
     window.redefine = null;
     window.notebookModule = null;
+    function serializeCellName(cell) {
+      return cell.replace(/ /g, "_");
+    }
   </script>
   <script type="module">
     import {
@@ -28,7 +31,8 @@
 
     if (params.has("notebook")) {
       const notebook = params.get("notebook");
-      const targets = params.has("targets")
+      document.title = `${notebook} / ${document.title}`
+      const targets = params.has("targets") && params.get("targets").length > 0
         ? params.get("targets").split(",")
         : [];
       const OBSERVABLEHQ_API_KEY = params.has("OBSERVABLEHQ_API_KEY")
@@ -42,7 +46,7 @@
         observer = (name) => {
           if (!targetSet.has(name)) return null;
           const node = document.createElement("div");
-          node.setAttribute("id", `notebook-${name}`);
+          node.setAttribute("id", `notebook-${serializeCellName(name)}`);
           const i = new Inspector(document.body.appendChild(node));
           return {
             pending() {
@@ -80,7 +84,6 @@
         };
         window.redefineFileAttachments = (files) => {
           const fa = new Map(files);
-          console.log(fa);
           window.notebookModule
             .redefine('FileAttachment', [], () => window.rt.fileAttachments(name=>fa.get(name)));
         };

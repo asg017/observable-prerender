@@ -142,9 +142,12 @@ Although not required, a solid understanding of the Observable notebook runtime 
 
 ### prerender.**load**(notebook, _targets_, _config_)
 
-Load the given notebook into a page in a browser. `notebook` is the id of the notebook on observablehq.com, like `@d3/bar-chart` or `@asg017/bitmoji`. For unlisted notebooks, be sure to include the `d/` prefix (e.g. `d/27a0b05d777304bd`). `targets` is an array of cell names that will be evaluated. Every cell in `targets` (and the cells they depend on) will be evaluated and render to the page's DOM. If not supplied, then all cells (including anonymous ones) will be evaluated by default.
+Load the given notebook into a page in a browser. 
 
-`config` is an object with key/values for more control over how to load the notebook.
+- `notebook` <[string]> ID of the notebook on observablehq.com, like `@d3/bar-chart` or `@asg017/bitmoji`. For unlisted notebooks, be sure to include the `d/` prefix (e.g. `d/27a0b05d777304bd`). 
+- `targets` <[Array]<[string]>> array of cell names that will be evaluated. Every cell in `targets` (and the cells they depend on) will be evaluated and render to the page's DOM. If not supplied, then all cells (including anonymous ones) will be evaluated by default.
+
+- `config` is an object with key/values for more control over how to load the notebook.
 
 | Key                    | Value                                                                                                                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -177,9 +180,13 @@ Take a screenshot of the container of the element that contains the rendered val
 
 If `cell` is a SVG cell, this will save that cell's SVG into `path`, like `.screenshot()`. Keep in mind, the browser's CSS won't be exported into the SVG, so beware of styling with `class`.
 
+### notebook.**pdf**(path, _options_)
+
+Use Puppeteer's [`.pdf()`](https://pptr.dev/#?product=Puppeteer&version=v5.3.1&show=api-pagepdfoptions) function to render the entire page as a PDF. `path` is the path of the PDF to save to, `options` will be passed into Puppeteer's `.pdf()` function. This will wait for all the cells in the notebook to be fulfilled. Note, this can't be used on a non-headless browser.
+
 ### notebook.**waitFor**(cell, _status_)
 
-Returns a Promise that resolves when the cell named `cell` is `"fulfilled"` (see the Observable inspector documentation for more details). The default is fulfilled, but `status` could also be `"pending"` or `"rejected"`. Use this function to ensure that youre redefined changes propagate to dependent cells.
+Returns a Promise that resolves when the cell named `cell` is `"fulfilled"` (see the Observable inspector documentation for more details). The default is fulfilled, but `status` could also be `"pending"` or `"rejected"`. Use this function to ensure that youre redefined changes propagate to dependent cells. If no parameters are passed in, then the Promise will wait all the cells, including un-named ones, to finish executing.
 
 ### notebook.**fileAttachments**(files)
 

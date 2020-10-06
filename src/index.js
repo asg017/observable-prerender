@@ -6,6 +6,10 @@ const fs = require("fs");
 const DEFAULT_WIDTH = 1200;
 const DEFAULT_HEIGHT = Math.floor((DEFAULT_WIDTH * 9) / 16);
 
+function serializeCellName(cell) {
+  return cell.replace(/ /g, "_");
+}
+
 class Notebook {
   constructor(browser, page) {
     this.browser = browser;
@@ -19,32 +23,35 @@ class Notebook {
   // inspired by https://observablehq.com/@mbostock/saving-svg
   async svg(cell, path) {
     await this.waitFor(cell);
-    const html = await this.page.$eval(`#notebook-${cell} > svg`, (e) => {
-      const xmlns = "http://www.w3.org/2000/xmlns/";
-      const xlinkns = "http://www.w3.org/1999/xlink";
-      const svgns = "http://www.w3.org/2000/svg";
+    const html = await this.page.$eval(
+      `#notebook-${serializeCellName(cell)} > svg`,
+      (e) => {
+        const xmlns = "http://www.w3.org/2000/xmlns/";
+        const xlinkns = "http://www.w3.org/1999/xlink";
+        const svgns = "http://www.w3.org/2000/svg";
 
-      const svg = e.cloneNode(true);
-      const fragment = window.location.href + "#";
-      const walker = document.createTreeWalker(
-        svg,
-        NodeFilter.SHOW_ELEMENT,
-        null,
-        false
-      );
-      while (walker.nextNode()) {
-        for (const attr of walker.currentNode.attributes) {
-          if (attr.value.includes(fragment)) {
-            attr.value = attr.value.replace(fragment, "#");
+        const svg = e.cloneNode(true);
+        const fragment = window.location.href + "#";
+        const walker = document.createTreeWalker(
+          svg,
+          NodeFilter.SHOW_ELEMENT,
+          null,
+          false
+        );
+        while (walker.nextNode()) {
+          for (const attr of walker.currentNode.attributes) {
+            if (attr.value.includes(fragment)) {
+              attr.value = attr.value.replace(fragment, "#");
+            }
           }
         }
+        svg.setAttributeNS(xmlns, "xmlns", svgns);
+        svg.setAttributeNS(xmlns, "xmlns:xlink", xlinkns);
+        const serializer = new window.XMLSerializer();
+        const string = serializer.serializeToString(svg);
+        return string;
       }
-      svg.setAttributeNS(xmlns, "xmlns", svgns);
-      svg.setAttributeNS(xmlns, "xmlns:xlink", xlinkns);
-      const serializer = new window.XMLSerializer();
-      const string = serializer.serializeToString(svg);
-      return string;
-    });
+    );
     await new Promise((resolve, reject) =>
       fs.writeFile(path, html, "utf8", (err) => (err ? reject(err) : resolve()))
     );
@@ -52,10 +59,46 @@ class Notebook {
   }
   async screenshot(cell, path, options = {}) {
     await this.waitFor(cell);
-    const container = await this.page.$(`#notebook-${cell}`);
+    const container = await this.page.$(`#notebook-${serializeCellName(cell)}`);
     return await container.screenshot({ path, ...options });
   }
+
+  async pdf(path, options = {}) {
+    await this.waitFor();
+    options = Object.assign(options, { path: path });
+    return await this.page.pdf(options);
+  }
+
   async waitFor(cell, status = "fulfilled") {
+    if (!cell) {
+      return await this.page.evaluate(async () => {
+        // with <3 from https://observablehq.com/@observablehq/notebook-visualizer
+        const result = await Promise.all(
+          Array.from(window.notebookModule._runtime._variables)
+            .filter(
+              (v) =>
+                !(
+                  (v._inputs.length === 1 && v._module !== v._inputs[0]._module) // isimport
+                ) && v._reachable
+            )
+            .filter(
+              (v) => v._module !== window.notebookModule._runtime._builtin
+            )
+            // this is basically .value
+            // https://github.com/observablehq/runtime/blob/master/src/module.js#L55-L64
+            .map(async (v) => {
+              if (v._observer === {}) {
+                v._observer = true;
+                window.notebookModule._runtime._dirty.add(v);
+              }
+              await window.notebookModule._runtime._compute();
+              await v._promise;
+              return true;
+            })
+        );
+        return Promise.resolve(true);
+      });
+    }
     await this.page.waitForFunction(
       (cell, status) => window.targetStatus.get(cell) === status,
       {},
