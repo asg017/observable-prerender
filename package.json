@@ -14,7 +14,13 @@
   },
   "bin": {
     "observable-prerender": "bin/observable-prerender",
-    "observable-prerender-animate": "bin/observable-prerender-animate"
+    "observable-prerender-animate": "bin/observable-prerender-animate",
+    "observable-prerender-benchmark": "bin/observable-prerender-benchmark",
+    "observable-prerender-open": "bin/observable-prerender-open",
+    "op": "bin/observable-prerender",
+    "op-animate": "bin/observable-prerender-animate",
+    "op-benchmark": "bin/observable-prerender-benchmark",
+    "op-open": "bin/observable-prerender-open"
   },
   "files": [
     "src/*",
