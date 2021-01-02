@@ -8,7 +8,7 @@ test("basic tests", async (t) => {
   const notebook = await load("d/b6147a7172ef9c60", cells);
   [a, b, c, d] = await Promise.all(cells.map((d) => notebook.value(d)));
 
-  t.equals(a, 1);
+  t.equal(a, 1);
   t.equals(b, 2);
   t.equals(c, 3);
   t.equals(d, 100);

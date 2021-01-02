@@ -1,6 +1,5 @@
 const puppeteer = require("puppeteer");
 const path = require("path");
-const querystring = require("querystring");
 const fs = require("fs");
 
 const DEFAULT_WIDTH = 1200;
@@ -10,15 +9,31 @@ function serializeCellName(cell) {
   return cell.replace(/ /g, "_");
 }
 
+const htmlPage = fs.readFileSync(
+  path.join(__dirname, "content", "index.html"),
+  "utf8"
+);
+
 class Notebook {
   constructor(browser, page) {
     this.browser = browser;
     this.page = page;
+    this.events = [];
   }
   async value(cell) {
+    await this.page.waitForFunction(() => window.notebookModule);
     return await this.page.evaluate(async (cell) => {
       return await window.notebookModule.value(cell);
     }, cell);
+  }
+  async html(cell, path) {
+    await this.waitFor(cell);
+    const html = this.page.$eval(
+      `#notebook-${serializeCellName(cell)}`,
+      (e) => e.innerHTML
+    );
+    if (path) return fs.writeFileSync(path, html);
+    return html;
   }
   // inspired by https://observablehq.com/@mbostock/saving-svg
   async svg(cell, path) {
@@ -52,10 +67,13 @@ class Notebook {
         return string;
       }
     );
-    await new Promise((resolve, reject) =>
-      fs.writeFile(path, html, "utf8", (err) => (err ? reject(err) : resolve()))
-    );
-    return;
+    if (path)
+      return new Promise((resolve, reject) =>
+        fs.writeFile(path, html, "utf8", (err) =>
+          err ? reject(err) : resolve()
+        )
+      );
+    return html;
   }
   async screenshot(cell, path, options = {}) {
     await this.waitFor(cell);
@@ -69,11 +87,12 @@ class Notebook {
     return await this.page.pdf(options);
   }
 
-  async waitFor(cell, status = "fulfilled") {
+  async waitFor(cell) {
+    await this.page.waitForFunction(() => window.notebookModule);
     if (!cell) {
       return await this.page.evaluate(async () => {
         // with <3 from https://observablehq.com/@observablehq/notebook-visualizer
-        const result = await Promise.all(
+        await Promise.all(
           Array.from(window.notebookModule._runtime._variables)
             .filter(
               (v) =>
@@ -99,12 +118,9 @@ class Notebook {
         return Promise.resolve(true);
       });
     }
-    await this.page.waitForFunction(
-      (cell, status) => window.targetStatus.get(cell) === status,
-      {},
-      cell,
-      status
-    );
+    return await this.page.evaluate(async (cell) => {
+      return window.notebookModule.value(cell);
+    }, cell);
   }
 
   // arg files is an object where keys are the file attachment names
@@ -173,6 +189,7 @@ async function load(notebook, targets = [], config = {}) {
     headless = true,
     width = DEFAULT_WIDTH,
     height = DEFAULT_HEIGHT,
+    benchmark = false,
   } = config;
   if (!browser) {
     browser = page
@@ -186,21 +203,37 @@ async function load(notebook, targets = [], config = {}) {
   if (!page) {
     page = await browser.newPage();
   }
-  await page.goto(
-    `file://${path.join(
-      __dirname,
-      "content",
-      "index.html"
-    )}?${querystring.encode({
-      notebook,
-      targets: targets.length > 0 ? targets.join(",") : undefined,
-      OBSERVABLEHQ_API_KEY,
-    })}`
+
+  const nb = new Notebook(browser, page);
+  page.exposeFunction(
+    "__OBSERVABLE_PRERENDER_BENCHMARK",
+    (name, status, time) => {
+      nb.events.push({
+        type: "benchmark",
+        data: { name, status, time },
+      });
+    }
   );
 
-  await page.content();
-  await page.waitForFunction(() => window.redefine && window.targetStatus);
-  return new Notebook(browser, page);
+  await page.setContent(htmlPage, { waitUntil: "load" });
+
+  await page.waitForFunction(() => window.run);
+
+  await page.evaluate(
+    async (notebook, targets, OBSERVABLEHQ_API_KEY, benchmark) =>
+      window.run({
+        notebook,
+        targets,
+        OBSERVABLEHQ_API_KEY,
+        benchmark,
+      }),
+    notebook,
+    targets,
+    OBSERVABLEHQ_API_KEY,
+    benchmark
+  );
+
+  return nb;
 }
 
 module.exports = { load, DEFAULT_WIDTH, DEFAULT_HEIGHT };

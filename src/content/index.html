@@ -14,7 +14,6 @@
 
 <body>
   <script>
-    window.targetStatus = new Map();
     window.redefine = null;
     window.notebookModule = null;
     function serializeCellName(cell) {
@@ -29,19 +28,46 @@
 
     const params = new URLSearchParams(window.location.search);
 
-    if (params.has("notebook")) {
-      const notebook = params.get("notebook");
-      document.title = `${notebook} / ${document.title}`
-      const targets = params.has("targets") && params.get("targets").length > 0
-        ? params.get("targets").split(",")
-        : [];
-      const OBSERVABLEHQ_API_KEY = params.has("OBSERVABLEHQ_API_KEY")
-        ? params.get("OBSERVABLEHQ_API_KEY")
-        : null;
+    function run(params = {}) {
+      const { notebook, targets, benchmark, OBSERVABLEHQ_API_KEY } = params;
       let observer;
 
-      // only embed specific cells.
-      if (targets.length > 0) {
+      document.title = `${notebook} / ${document.title}`;
+
+      if (benchmark) {
+        observer = (name) => {
+          if (!name) return null;
+          const node = document.createElement("div");
+          node.setAttribute("id", `notebook-${serializeCellName(name)}`);
+          const i = new Inspector(document.body.appendChild(node));
+          return {
+            pending() {
+              window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                name,
+                "pending",
+                Date.now()
+              );
+              i.pending();
+            },
+            fulfilled(value) {
+              window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                name,
+                "fulfilled",
+                Date.now()
+              );
+              i.fulfilled(value);
+            },
+            rejected(error) {
+              window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                name,
+                "rejected",
+                Date.now()
+              );
+              i.rejected(error);
+            },
+          };
+        };
+      } else if (targets.length > 0) {
         const targetSet = new Set(targets);
         observer = (name) => {
           if (!targetSet.has(name)) return null;
@@ -50,21 +76,36 @@
           const i = new Inspector(document.body.appendChild(node));
           return {
             pending() {
-              targetStatus.set(name, "pending");
+              if (benchmark)
+                window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                  name,
+                  "pending",
+                  Date.now()
+                );
               i.pending();
             },
             fulfilled(value) {
-              targetStatus.set(name, "fulfilled");
+              if (benchmark)
+                window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                  name,
+                  "fulfilled",
+                  Date.now()
+                );
               i.fulfilled(value);
             },
             rejected(error) {
-              targetStatus.set(name, "rejected");
+              if (benchmark)
+                window.__OBSERVABLE_PRERENDER_BENCHMARK(
+                  name,
+                  "rejected",
+                  Date.now()
+                );
               i.rejected(error);
             },
           };
         };
-      } 
-      // embed entire notebook, no regard 
+      }
+      // embed entire notebook, no regard
       else {
         observer = Inspector.into(document.body);
       }
@@ -84,10 +125,12 @@
         };
         window.redefineFileAttachments = (files) => {
           const fa = new Map(files);
-          window.notebookModule
-            .redefine('FileAttachment', [], () => window.rt.fileAttachments(name=>fa.get(name)));
+          window.notebookModule.redefine("FileAttachment", [], () =>
+            window.rt.fileAttachments((name) => fa.get(name))
+          );
         };
       });
     }
+    window.run = run;
   </script>
 </body>
