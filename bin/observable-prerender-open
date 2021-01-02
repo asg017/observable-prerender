@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+const { program } = require("commander");
+const { load, DEFAULT_WIDTH, DEFAULT_HEIGHT } = require("../src");
+
+program
+  .version(require("../package.json").version)
+  .arguments("<notebook> [cells...]")
+  .description("Open an Observable notebook.")
+  .option(
+    "-w, --width <value>",
+    `Width of the Puppeteer browser. Default ${DEFAULT_WIDTH}`
+  )
+  .option(
+    "-h, --height <value>",
+    `Height of th Puppeteer browser. Default ${DEFAULT_HEIGHT}`
+  )
+  .action(async function (argNotebook, argCells) {
+    const opts = program.opts();
+
+    let { width, height } = opts;
+
+    if (width) width = +width;
+    if (height) height = +height;
+
+    const config = {
+      width,
+      height,
+      headless: false,
+    };
+
+    await load(argNotebook, argCells, config);
+  });
+
+program.parse(process.argv);
