@@ -2,7 +2,7 @@
 const { program } = require("commander");
 const { load } = require("../src");
 
-const validFormats = new Set(["json"]);
+const validFormats = new Set(["json", "html"]);
 
 program
   .version(require("../package.json").version)
@@ -12,7 +12,7 @@ program
     "--no-headless",
     "Turn off headless mode on the Puppeteer browser, meaning open the browser to the user."
   )
-  .option("-f, --format [format]", "Type of output, json only.", "json")
+  .option("-f, --format [format]", "Type of output, json or html.", "json")
   .action(function (argNotebook, argCells) {
     const opts = program.opts();
     const { headless, format } = opts;
@@ -52,12 +52,26 @@ program
           }));
       });
       const metrics = await notebook.page.metrics();
+      const benchmarkResults = {
+        notebook: argNotebook,
+        cells: argCells,
+        graph,
+        events: notebook.events,
+        metrics,
+      };
       switch (format) {
         case "json":
-          console.log(
-            JSON.stringify({ graph, events: notebook.events, metrics })
-          );
+          console.log(JSON.stringify(benchmarkResults));
           break;
+        case "html":
+          const resultsNotebook = await load("d/7dc9b816179869cc", ["all"], {
+            browser: notebook.browser,
+          });
+          await resultsNotebook.redefine(
+            "src",
+            JSON.stringify(benchmarkResults)
+          );
+          await resultsNotebook.html("all", "test.html");
       }
 
       await notebook.browser.close();

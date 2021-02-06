@@ -28,7 +28,7 @@ class Notebook {
   }
   async html(cell, path) {
     await this.waitFor(cell);
-    const html = this.page.$eval(
+    const html = await this.page.$eval(
       `#notebook-${serializeCellName(cell)}`,
       (e) => e.innerHTML
     );
@@ -165,6 +165,7 @@ class Notebook {
     }, files);
   }
   async redefine(cell, value) {
+    await this.page.waitForFunction(() => window.redefine);
     if (typeof cell === "string") {
       await this.page.evaluate(
         (cell, value) => {

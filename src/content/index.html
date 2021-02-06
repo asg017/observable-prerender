@@ -26,8 +26,6 @@
       Inspector,
     } from "https://cdn.jsdelivr.net/npm/@observablehq/runtime@4/dist/runtime.js";
 
-    const params = new URLSearchParams(window.location.search);
-
     function run(params = {}) {
       const { notebook, targets, benchmark, OBSERVABLEHQ_API_KEY } = params;
       let observer;

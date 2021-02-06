@@ -21,7 +21,11 @@ program
     "--file-attachments <file attachment:path...>",
     "Redefine a file attachment with a local file"
   )
-  .option("-f, --format [format]", "Type of output, png, jpeg, or svg", null)
+  .option(
+    "-f, --format [format]",
+    "Type of output, png, jpeg, svg, or html",
+    null
+  )
   .option(
     "-o, --out [file]",
     "Output file path. Can only be used when one cell name is passed into 'cells'."
@@ -80,7 +84,7 @@ program
 
     if (out) {
       const outFileFormat = out.substring(out.lastIndexOf(".") + 1);
-      if (["png", "svg", "jpeg"].includes(outFileFormat)) {
+      if (["png", "svg", "jpeg", "html", "svg"].includes(outFileFormat)) {
         format = outFileFormat;
       } else {
         if (!format) {
@@ -166,6 +170,7 @@ program
               path
             );
           if (format === "svg") return notebook.svg(cell, path);
+          if (format === "html") return notebook.html(cell, path);
           return notebook.screenshot(cell, path, { type: format });
         })
       );
