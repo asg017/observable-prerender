@@ -7,6 +7,17 @@ const {
   valueOfFile,
 } = require("./utils.js");
 const { join, isAbsolute } = require("path");
+const { writeFileSync } = require("rw").dash;
+
+const formatOptions = new Set([
+  "png",
+  "svg",
+  "jpeg",
+  "html",
+  "svg",
+  "text",
+  "txt",
+]);
 
 program
   .version(require("../package.json").version)
@@ -23,7 +34,7 @@ program
   )
   .option(
     "-f, --format [format]",
-    "Type of output, png, jpeg, svg, or html",
+    `Type of output: One of ${Array.from(formatOptions).join(", ")}.`,
     null
   )
   .option(
@@ -48,9 +59,9 @@ program
   )
   .option(
     "-h, --height <value>",
-    `Height of th Puppeteer browser. Default ${DEFAULT_HEIGHT}`
+    `Height of the Puppeteer browser. Default ${DEFAULT_HEIGHT}`
   )
-  .option("-q, --quiet", "Don't print out logs")
+  .option("-v, --verbose", "Print logs to follow progress.")
   .action(function (argNotebook, argCells) {
     const opts = program.opts();
     const {
@@ -62,7 +73,7 @@ program
       token,
       outDir,
       headless,
-      quiet,
+      verbose,
     } = opts;
 
     let { width, height, format } = opts;
@@ -82,14 +93,18 @@ program
       process.exit(1);
     }
 
-    if (out) {
+    if (out && out !== "-") {
       const outFileFormat = out.substring(out.lastIndexOf(".") + 1);
-      if (["png", "svg", "jpeg", "html", "svg"].includes(outFileFormat)) {
+      if (formatOptions.has(outFileFormat)) {
         format = outFileFormat;
       } else {
         if (!format) {
           console.error(
-            `Unknown file type "${outFileFormat}" passed in for --out parameter. Have the path end in .svg, .png, or .jpeg, or use the --format flag.`
+            `Unknown file type "${outFileFormat}" passed in for --out parameter. Use the --format flag, or ave the path with one of ${Array.from(
+              formatOptions
+            )
+              .map((d) => `.${d}`)
+              .join(", ")}.`
           );
           process.exit(1);
         }
@@ -109,68 +124,50 @@ program
     };
     if (token) config["OBSERVABLEHQ_API_KEY"] = token;
 
-    if (!quiet)
+    if (verbose)
       console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
+
     load(argNotebook, argCells, config).then(async (notebook) => {
-      if (redefines.length > 0) {
-        for (const { cell, value, format } of redefines) {
-          if (!quiet) console.log("Redefining ", cell, "with format ", format);
-          const val = format === "number" ? +value : value;
-          notebook.redefine(cell, val);
-        }
+      for (const redefine of redefines) {
+        const { cell, value, format } = redefine;
+        if (verbose) console.log(`Redefining ${cell} with format ${format}`);
+        const val = format === "number" ? +value : value;
+        notebook.redefine(cell, val);
       }
 
-      if (redefines.length > 0) {
-        for await (const {
-          cell,
-          value,
-          format: redefineFileFormat,
-        } of redefineFiles) {
-          if (!quiet)
-            console.log(
-              "Redefining ",
-              cell,
-              " with file ",
-              value,
-              " with format ",
-              redefineFileFormat
-            );
-          const data = await valueOfFile(value, redefineFileFormat);
-          notebook.redefine(cell, data);
-        }
+      for (const redefineFile of redefineFiles) {
+        const { cell, value, format: redefineFileFormat } = redefineFile;
+        if (verbose)
+          console.log(
+            `Redefining ${cell} with file ${value} with format ${redefineFileFormat}`
+          );
+        const data = await valueOfFile(value, redefineFileFormat);
+        notebook.redefine(cell, data);
       }
+
       if (redefineFileAttachments.length > 0) {
         const files = {};
         for (const { cell, value } of redefineFileAttachments) {
-          if (!quiet)
-            console.log(
-              "Replacing FileAttachment ",
-              cell,
-              " with file ",
-              value
-            );
+          if (verbose)
+            console.log(`Replacing FileAttachment ${cell} with file ${value}`);
           files[cell] = isAbsolute(value) ? value : join(process.cwd(), value);
         }
-
         await notebook.fileAttachments(files);
       }
 
       await Promise.all(
-        argCells.map((cell) => {
+        argCells.map(async (cell) => {
           const path = out
             ? out
             : join(outDir || process.cwd(), `${cell}.${format}`);
-          if (!quiet)
-            console.log(
-              "Saving cell ",
-              cell,
-              " as a ",
-              format,
-              " at file ",
-              path
-            );
+
+          if (verbose)
+            console.log(`Saving cell ${cell} as a ${format} file to ${path}`);
+
           if (format === "svg") return notebook.svg(cell, path);
           if (format === "html") return notebook.html(cell, path);
+          if (format === "text" || format === "txt")
+            return writeFileSync(path, await notebook.value(cell));
           return notebook.screenshot(cell, path, { type: format });
         })
       );

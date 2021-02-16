@@ -1,6 +1,6 @@
 const puppeteer = require("puppeteer");
 const path = require("path");
-const fs = require("fs");
+const rw = require("rw").dash;
 
 const DEFAULT_WIDTH = 1200;
 const DEFAULT_HEIGHT = Math.floor((DEFAULT_WIDTH * 9) / 16);
@@ -9,7 +9,7 @@ function serializeCellName(cell) {
   return cell.replace(/ /g, "_");
 }
 
-const htmlPage = fs.readFileSync(
+const htmlPage = rw.readFileSync(
   path.join(__dirname, "content", "index.html"),
   "utf8"
 );
@@ -32,14 +32,14 @@ class Notebook {
       `#notebook-${serializeCellName(cell)}`,
       (e) => e.innerHTML
     );
-    if (path) return fs.writeFileSync(path, html);
+    if (path) return rw.writeFileSync(path, html);
     return html;
   }
   // inspired by https://observablehq.com/@mbostock/saving-svg
   async svg(cell, path) {
     await this.waitFor(cell);
     const html = await this.page.$eval(
-      `#notebook-${serializeCellName(cell)} > svg`,
+      `#notebook-${serializeCellName(cell)} svg`,
       (e) => {
         const xmlns = "http://www.w3.org/2000/xmlns/";
         const xlinkns = "http://www.w3.org/1999/xlink";
@@ -69,7 +69,7 @@ class Notebook {
     );
     if (path)
       return new Promise((resolve, reject) =>
-        fs.writeFile(path, html, "utf8", (err) =>
+        rw.writeFile(path, html, "utf8", (err) =>
           err ? reject(err) : resolve()
         )
       );
@@ -140,7 +140,7 @@ class Notebook {
             `Only files exposed in the .fileAttachments argument can be exposed.`
           );
         }
-        fs.readFile(filePath, "utf8", (err, text) => {
+        rw.readFile(filePath, "utf8", (err, text) => {
           if (err) reject(err);
           else resolve(text);
         });
