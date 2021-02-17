@@ -17,6 +17,7 @@ const formatOptions = new Set([
   "svg",
   "text",
   "txt",
+  "json",
 ]);
 
 program
@@ -168,6 +169,11 @@ program
           if (format === "html") return notebook.html(cell, path);
           if (format === "text" || format === "txt")
             return writeFileSync(path, await notebook.value(cell));
+          if (format === "json")
+            return writeFileSync(
+              path,
+              JSON.stringify(await notebook.value(cell))
+            );
           return notebook.screenshot(cell, path, { type: format });
         })
       );
