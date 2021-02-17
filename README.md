@@ -142,9 +142,9 @@ Although not required, a solid understanding of the Observable notebook runtime 
 
 ### prerender.**load**(notebook, _targets_, _config_)
 
-Load the given notebook into a page in a browser. 
+Load the given notebook into a page in a browser.
 
-- `notebook` <[string]> ID of the notebook on observablehq.com, like `@d3/bar-chart` or `@asg017/bitmoji`. For unlisted notebooks, be sure to include the `d/` prefix (e.g. `d/27a0b05d777304bd`). 
+- `notebook` <[string]> ID of the notebook on observablehq.com, like `@d3/bar-chart` or `@asg017/bitmoji`. For unlisted notebooks, be sure to include the `d/` prefix (e.g. `d/27a0b05d777304bd`).
 - `targets` <[Array]<[string]>> array of cell names that will be evaluated. Every cell in `targets` (and the cells they depend on) will be evaluated and render to the page's DOM. If not supplied, then all cells (including anonymous ones) will be evaluated by default.
 
 - `config` is an object with key/values for more control over how to load the notebook.
@@ -208,7 +208,6 @@ Pre-render the given notebook, iterate through the values of the `cellIterator` 
 
 Run `observable-prerender-animate --help` to get a full list of options.
 
-
 ## Caveats
 
 ### Beta
@@ -226,3 +225,19 @@ You won't be able to make neat screencasts from all Observable notebooks. Puppet
 So what should you screenshot, exactly? It depends on your notebook. You probably need to have some counter/index/pointer that changes the graph when updated (see [scrubber](https://observablehq.com/@mbostock/scrubber)). You can programmatically redefine that cell using `notebook.redefine` in some loop, then screenshot the graph once the changes propagate (`notebook.waitFor`). But keep in mind, this may work for JS transitions, but CSS animations may not render properly or in time, so it really depends on how you built your notebook. it's super hard to get it right without some real digging.
 
 If you run into any issues getting frames for a animation, feel free to open an issue!
+
+## "Benchmarking"
+
+In this project, "Benchmarking" can refer to three different things: the `op-benchmark` CLI tool, internal benchmarks for the package, and external benchmarks for comparing against other embedding options.
+
+### `op-benchmark` for Benchmarking Notebooks
+
+`op-benchmark` is a CLI tool bundled with `observable-prerender` that measures how long every cell's execution time for a given notebook. It's meant to be used by anyone to test their own notebooks, and is part of the `observable-prerender` suite of tools.
+
+### Internal Benchmarking
+
+`/benchmark-internal` is a series of tests performed against `observable-prerender` to ensure `observable-prerender` runs as fast as possible, and that new changes to drastically effect the performace of the tool. This is meant to be used by `observable-prerender` developers, not by users of the `observable-prerender` tool.
+
+#### External Benchmarking
+
+`/benchmark-external` contains serveral tests to compare `observable-prerender` with other Observable notebook embeding options. A common use-case for `observable-prerender` is to pre-render Observable notebooks for faster performance for end users, so these tests are to ensure and measure how much faster `observable-prerender` actually is. This is meant for `observable-prerender` developers, not for general users.
