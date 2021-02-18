@@ -37,6 +37,9 @@ class Notebook {
   async close() {
     return this.launchedBrowser ? this.browser.close() : this.page.close();
   }
+  async $(cellName) {
+    return this.page.$(`#notebook-${serializeCellName(cellName)}`);
+  }
   async _value(cell) {
     await this.page.waitForFunction(() => window.notebookModule);
     return await this.page.evaluate(async (cell) => {
@@ -76,9 +79,8 @@ class Notebook {
   }
   async html(cell, path) {
     await this.waitFor(cell);
-    const html = await this.page.$eval(
-      `#notebook-${serializeCellName(cell)}`,
-      (e) => e.innerHTML
+    const html = await this.$(cell).then((container) =>
+      container.evaluate((e) => e.innerHTML)
     );
     if (path) return rw.writeFileSync(path, html);
     return html;
@@ -86,9 +88,8 @@ class Notebook {
   // inspired by https://observablehq.com/@mbostock/saving-svg
   async svg(cell, path) {
     await this.waitFor(cell);
-    const html = await this.page.$eval(
-      `#notebook-${serializeCellName(cell)} svg`,
-      (e) => {
+    const html = await this.$(cell).then((container) =>
+      container.$eval(`svg`, (e) => {
         const xmlns = "http://www.w3.org/2000/xmlns/";
         const xlinkns = "http://www.w3.org/1999/xlink";
         const svgns = "http://www.w3.org/2000/svg";
@@ -113,7 +114,7 @@ class Notebook {
         const serializer = new window.XMLSerializer();
         const string = serializer.serializeToString(svg);
         return string;
-      }
+      })
     );
     if (path)
       return new Promise((resolve, reject) =>
@@ -125,7 +126,7 @@ class Notebook {
   }
   async screenshot(cell, path, options = {}) {
     await this.waitFor(cell);
-    const container = await this.page.$(`#notebook-${serializeCellName(cell)}`);
+    const container = await this.$(cell);
     return await container.screenshot({ path, ...options });
   }
 

@@ -192,6 +192,10 @@ Returns a Promise that resolves when the cell named `cell` is `"fulfilled"` (see
 
 Replace the [FileAttachments](https://observablehq.com/@observablehq/file-attachments) of the notebook with those defined in `files`. `files` is an object where the keys are the names of the FileAttachment, and the values are the absolute paths to the files that will replace the FileAttachments.
 
+### notebook.**\$**(cell)
+
+Returns the [`ElementHandle`](https://pptr.dev/#?product=Puppeteer&version=v7.1.0&show=api-class-elementhandle) of the container HTML element for the given observed cell. Can be used to call `.click()`, `.screenshot()`, `.evaluate()`, or any other method to have more control of a specfic rendered cell.
+
 ## CLI Reference
 
 `observable-prerender` also comes bundled with 2 CLI programs, `observable-prerender` and `observable-prerender-animate`, that allow you to more quickly pre-render notebooks and integrate with local files and other CLI tools.
