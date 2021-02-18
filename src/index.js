@@ -1,5 +1,5 @@
 const puppeteer = require("puppeteer");
-const path = require("path");
+const { extname, join } = require("path");
 const rw = require("rw").dash;
 
 const DEFAULT_WIDTH = 1200;
@@ -10,7 +10,7 @@ function serializeCellName(cell) {
 }
 
 const htmlPage = rw.readFileSync(
-  path.join(__dirname, "content", "index.html"),
+  join(__dirname, "content", "index.html"),
   "utf8"
 );
 
@@ -125,8 +125,36 @@ class Notebook {
     return html;
   }
   async screenshot(cell, path, options = {}) {
+    const { extension = "png", quality = 1, encoding } = options;
     await this.waitFor(cell);
     const container = await this.$(cell);
+    const canvas = await container.$("canvas");
+    if (canvas) {
+      const pathExtension = (path && extname(path).slice(1)) || extension;
+      const dataURL = await canvas.evaluate(
+        (element, pathExtension, quality) =>
+          element.toDataURL(`image/${pathExtension}`, quality),
+        pathExtension,
+        quality
+      );
+      const matches = dataURL.match(/^data:.+\/(.+);base64,(.*)$/);
+      const dataURLExtension = matches[1];
+      const dataURLData = matches[2];
+      const buffer = Buffer.from(dataURLData, "base64");
+      if (pathExtension !== dataURLExtension.replace("image/", "")) {
+        throw new ObservablePrerenderError(
+          `The provided extension ${pathExtension} was not supported by the canvas, "${dataURLExtension}" returned.`
+        );
+      }
+
+      if (path) {
+        return rw.writeFileSync(path, buffer);
+      }
+
+      return options.encoding && options.encoding === "base64"
+        ? buffer
+        : dataURLData;
+    }
     return await container.screenshot({ path, ...options });
   }
 

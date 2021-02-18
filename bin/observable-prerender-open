@@ -19,7 +19,7 @@ p.action(async function (argNotebook, argCells) {
   const opts = program.opts();
   const config = getNotebookConfig(opts);
   console.log(config.headless);
-  config.headless = false;
+  //config.headless = false;
   load(argNotebook, argCells, config)
     .then(async (notebook) => {
       await runRedefines(notebook, opts, true);
