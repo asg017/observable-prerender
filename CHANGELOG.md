@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.4.0] - 2021-02-18
+
+### Added
+
+- `notebook.$(cellName)` method to get the ElementHandle of a cell's container.
+- New `--browser-wsendpoint` on `op` CLI programs for connecting to remote browser instances.
+- Better error handling when loading non-existant notebook and cells.
+- `notebook.close()` to close the notebook's browser when done, or only the notebook's page if connected to remote browser.
+
+### Fixed
+
+- Bugs on some CLI programs that didn't allow reading from stdin in `--redefine-file` and `--file-attachments`
+
 ## [v0.3.0] - 2021-02-16
 
 ### Added
