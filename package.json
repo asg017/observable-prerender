@@ -1,6 +1,6 @@
 {
   "name": "@alex.garcia/observable-prerender",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Pre-render and programmatically control Observable notebooks with Puppeteer!",
   "main": "src/index.js",
   "author": "Alex Garcia <alexsebastian.garcia@gmail.com>",
