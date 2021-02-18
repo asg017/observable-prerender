@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 const { program } = require("commander");
 const { load } = require("../src");
-const { applyBrowserOptions, applyRedefineOptions } = require("./utils.js");
+const {
+  applyBrowserOptions,
+  applyRedefineOptions,
+  getNotebookConfig,
+  runRedefines,
+} = require("./utils.js");
 const { join } = require("path");
 
 function parseArgIter(iter) {
