@@ -245,11 +245,11 @@ async function load(notebook, targets = [], config = {}) {
   let launchedBrowser = false;
   if (!browser) {
     if (page) browser = page.browser();
-    else if (browserWSEndpoint)
+    else if (browserWSEndpoint) {
       browser = await puppeteer.connect({
         browserWSEndpoint,
       });
-    else {
+    } else {
       browser = await puppeteer.launch({
         defaultViewport: { width, height },
         args: [`--window-size=${width},${height}`],

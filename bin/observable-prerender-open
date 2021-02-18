@@ -25,6 +25,7 @@ p.action(async function (argNotebook, argCells) {
       await runRedefines(notebook, opts, true);
       console.log(`Notebook ${argNotebook} loaded.`);
       console.log(notebook.browser.wsEndpoint());
+      process.on("exit", () => notebook.close());
     })
     .catch((error) => {
       console.error(`Error caught when loading ${argNotebook} with`, argCells);
