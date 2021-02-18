@@ -23,9 +23,10 @@
   <script type="module">
     import {
       Runtime,
+      RuntimeError,
       Inspector,
     } from "https://cdn.jsdelivr.net/npm/@observablehq/runtime@4/dist/runtime.js";
-
+    Object.assign(window, { Runtime, RuntimeError, Inspector });
     function run(params = {}) {
       const { notebook, targets, benchmark, OBSERVABLEHQ_API_KEY } = params;
       let observer;
@@ -111,23 +112,26 @@
         OBSERVABLEHQ_API_KEY ? `&api_key=${OBSERVABLEHQ_API_KEY}` : ""
       }`;
 
-      import(notebookLink).then(async ({ default: define }) => {
-        window.rt = new Runtime();
-        const o = observer;
-        const m = window.rt.module(define, o);
-        window.notebookModule = m;
-        window.redefine = (redefine) => {
-          for (let cell in redefine) {
-            m.redefine(cell, redefine[cell]);
-          }
-        };
-        window.redefineFileAttachments = (files) => {
-          const fa = new Map(files);
-          window.notebookModule.redefine("FileAttachment", [], () =>
-            window.rt.fileAttachments((name) => fa.get(name))
-          );
-        };
-      });
+      return import(notebookLink)
+        .then(async ({ default: define }) => {
+          window.rt = new Runtime();
+          const o = observer;
+          const m = window.rt.module(define, o);
+          window.notebookModule = m;
+          window.redefine = (redefine) => {
+            for (let cell in redefine) {
+              m.redefine(cell, redefine[cell]);
+            }
+          };
+          window.redefineFileAttachments = (files) => {
+            const fa = new Map(files);
+            window.notebookModule.redefine("FileAttachment", [], () =>
+              window.rt.fileAttachments((name) => fa.get(name))
+            );
+          };
+          return null;
+        })
+        .catch((error) => error);
     }
     window.run = run;
   </script>

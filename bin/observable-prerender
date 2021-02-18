@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 const { program } = require("commander");
-const { load, DEFAULT_WIDTH, DEFAULT_HEIGHT } = require("../src");
+const { load } = require("../src");
 const {
-  parseArgRedefines,
-  parseArgRedefineFiles,
-  valueOfFile,
+  applyBrowserOptions,
+  applyRedefineOptions,
+  getNotebookConfig,
+  runRedefines,
+  consolidateFormat,
 } = require("./utils.js");
-const { join, isAbsolute } = require("path");
+const { join } = require("path");
 const { writeFileSync } = require("rw").dash;
 
 const formatOptions = new Set([
@@ -20,19 +22,10 @@ const formatOptions = new Set([
   "json",
 ]);
 
-program
+let p = program
   .version(require("../package.json").version)
   .arguments("<notebook> [cells...]")
   .description("Pre-render an Observable notebook.")
-  .option("--redefine <cell:value...>", "Redefine a cell (string only)")
-  .option(
-    "--redefine-file <cell:<string,json,ndjson,csv>:value...>",
-    "Redefine a cell with a file"
-  )
-  .option(
-    "--file-attachments <file attachment:path...>",
-    "Redefine a file attachment with a local file"
-  )
   .option(
     "-f, --format [format]",
     `Type of output: One of ${Array.from(formatOptions).join(", ")}.`,
@@ -50,135 +43,67 @@ program
     "--token <token>",
     "An observablehq.com API token to access the notebook."
   )
-  .option(
-    "--no-headless",
-    "Turn off headless mode on the Puppeteer browser, meaning open the browser to the user."
-  )
-  .option(
-    "-w, --width <value>",
-    `Width of the Puppeteer browser. Default ${DEFAULT_WIDTH}`
-  )
-  .option(
-    "-h, --height <value>",
-    `Height of the Puppeteer browser. Default ${DEFAULT_HEIGHT}`
-  )
-  .option("-v, --verbose", "Print logs to follow progress.")
-  .action(function (argNotebook, argCells) {
-    const opts = program.opts();
-    const {
-      version,
-      redefine = [],
-      redefineFile = [],
-      fileAttachments = [],
-      out,
-      token,
-      outDir,
-      headless,
-      verbose,
-    } = opts;
+  .option("-v, --verbose", "Print logs to follow progress.");
 
-    let { width, height, format } = opts;
+p = applyBrowserOptions(p);
+p = applyRedefineOptions(p);
 
-    if (width) width = +width;
-    if (height) height = +height;
+p.action(function (argNotebook, argCells) {
+  const opts = program.opts();
+  const { out, outDir, verbose } = opts;
+  let { format } = opts;
 
-    if (out && argCells.length > 1) {
-      console.error(
-        `Only 1 cell could be passed into 'cells' when '--out' is specified. ${argCells.length} were passed in.`
-      );
-      process.exit(1);
-    }
+  const notebookConfig = getNotebookConfig(opts);
 
-    if (out && outDir) {
-      console.error(`Only 1 of --out and --out-dir can be specified.`);
-      process.exit(1);
-    }
+  if (out && argCells.length > 1) {
+    console.error(
+      `Only 1 cell could be passed into 'cells' when '--out' is specified. ${argCells.length} were passed in.`
+    );
+    process.exit(1);
+  }
 
-    if (out && out !== "-") {
-      const outFileFormat = out.substring(out.lastIndexOf(".") + 1);
-      if (formatOptions.has(outFileFormat)) {
-        format = outFileFormat;
-      } else {
-        if (!format) {
-          console.error(
-            `Unknown file type "${outFileFormat}" passed in for --out parameter. Use the --format flag, or ave the path with one of ${Array.from(
-              formatOptions
-            )
-              .map((d) => `.${d}`)
-              .join(", ")}.`
-          );
-          process.exit(1);
-        }
-      }
-    } else {
-      if (!format) format = "svg";
-    }
+  if (out && outDir) {
+    console.error(`Only 1 of --out and --out-dir can be specified.`);
+    process.exit(1);
+  }
 
-    const redefines = parseArgRedefines(redefine);
-    const redefineFiles = parseArgRedefineFiles(redefineFile);
-    const redefineFileAttachments = parseArgRedefines(fileAttachments);
+  format = consolidateFormat(out, format, formatOptions, "svg");
 
-    const config = {
-      width,
-      height,
-      headless,
-    };
-    if (token) config["OBSERVABLEHQ_API_KEY"] = token;
+  if (verbose)
+    console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
 
-    if (verbose)
-      console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
+  load(argNotebook, argCells, notebookConfig).then(async (notebook) => {
+    await runRedefines(notebook, opts, verbose);
 
-    load(argNotebook, argCells, config).then(async (notebook) => {
-      for (const redefine of redefines) {
-        const { cell, value, format } = redefine;
-        if (verbose) console.log(`Redefining ${cell} with format ${format}`);
-        const val = format === "number" ? +value : value;
-        notebook.redefine(cell, val);
-      }
+    await Promise.all(
+      argCells.map(async (cell) => {
+        const path = out
+          ? out
+          : join(outDir || process.cwd(), `${cell}.${format}`);
 
-      for (const redefineFile of redefineFiles) {
-        const { cell, value, format: redefineFileFormat } = redefineFile;
         if (verbose)
-          console.log(
-            `Redefining ${cell} with file ${value} with format ${redefineFileFormat}`
+          console.log(`Saving cell ${cell} as a ${format} file to ${path}`);
+
+        if (format === "svg") return notebook.svg(cell, path);
+        if (format === "html") return notebook.html(cell, path);
+        if (format === "text" || format === "txt")
+          return writeFileSync(path, await notebook.value(cell));
+        if (format === "json")
+          return writeFileSync(
+            path,
+            JSON.stringify(await notebook.value(cell))
           );
-        const data = await valueOfFile(value, redefineFileFormat);
-        notebook.redefine(cell, data);
-      }
-
-      if (redefineFileAttachments.length > 0) {
-        const files = {};
-        for (const { cell, value } of redefineFileAttachments) {
-          if (verbose)
-            console.log(`Replacing FileAttachment ${cell} with file ${value}`);
-          files[cell] = isAbsolute(value) ? value : join(process.cwd(), value);
-        }
-        await notebook.fileAttachments(files);
-      }
-
-      await Promise.all(
-        argCells.map(async (cell) => {
-          const path = out
-            ? out
-            : join(outDir || process.cwd(), `${cell}.${format}`);
-
-          if (verbose)
-            console.log(`Saving cell ${cell} as a ${format} file to ${path}`);
-
-          if (format === "svg") return notebook.svg(cell, path);
-          if (format === "html") return notebook.html(cell, path);
-          if (format === "text" || format === "txt")
-            return writeFileSync(path, await notebook.value(cell));
-          if (format === "json")
-            return writeFileSync(
-              path,
-              JSON.stringify(await notebook.value(cell))
-            );
-          return notebook.screenshot(cell, path, { type: format });
-        })
-      );
-      notebook.browser.close();
+        return notebook.screenshot(cell, path, { type: format });
+      })
+    ).catch(async (error) => {
+      console.error(`Error encountered when rendering cells`);
+      console.error(error);
+      notebook.close();
+      process.exit(1);
     });
+    notebook.close();
+    process.exit(0);
   });
+});
 
 program.parse(process.argv);

@@ -14,17 +14,65 @@ const htmlPage = rw.readFileSync(
   "utf8"
 );
 
+class ObservablePrerenderError extends Error {
+  constructor(message, data, ...params) {
+    super(...params);
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ObservablePrerenderError);
+    }
+
+    this.message = message;
+    this.data = data;
+  }
+}
+
 class Notebook {
-  constructor(browser, page) {
+  constructor(browser, page, launchedBrowser) {
     this.browser = browser;
     this.page = page;
+    this.launchedBrowser = launchedBrowser;
     this.events = [];
+  }
+  async close() {
+    return this.launchedBrowser ? this.browser.close() : this.page.close();
+  }
+  async _value(cell) {
+    await this.page.waitForFunction(() => window.notebookModule);
+    return await this.page.evaluate(async (cell) => {
+      return await window.notebookModule
+        .value(cell)
+        .then((value) => ({ value }))
+        .catch((error) => {
+          if (error instanceof window.RuntimeError)
+            return { errorType: "runtime", error };
+          return { errorType: "other", error };
+        });
+    }, cell);
   }
   async value(cell) {
     await this.page.waitForFunction(() => window.notebookModule);
-    return await this.page.evaluate(async (cell) => {
-      return await window.notebookModule.value(cell);
-    }, cell);
+    const { value, error, errorType } = await this._value(cell);
+    if (!errorType) return value;
+    if (errorType === "runtime") {
+      if (error.message === `${cell} is not defined`)
+        throw new ObservablePrerenderError(
+          `There is no cell with name "${cell}" in the embeded notebook.`,
+          { cell, error }
+        );
+      throw new ObservablePrerenderError(
+        `An Observable Runtime error occured when getting the value for "${cell}": "${error.message}"`,
+        { cell, error }
+      );
+    }
+
+    throw new ObservablePrerenderError(
+      `The cell "${cell}" resolved to an error.`,
+      {
+        cell,
+        error,
+      }
+    );
   }
   async html(cell, path) {
     await this.waitFor(cell);
@@ -191,21 +239,29 @@ async function load(notebook, targets = [], config = {}) {
     width = DEFAULT_WIDTH,
     height = DEFAULT_HEIGHT,
     benchmark = false,
+    browserWSEndpoint,
   } = config;
+  let launchedBrowser = false;
   if (!browser) {
-    browser = page
-      ? page.browser()
-      : await puppeteer.launch({
-          defaultViewport: { width, height },
-          args: [`--window-size=${width},${height}`],
-          headless,
-        });
+    if (page) browser = page.browser();
+    else if (browserWSEndpoint)
+      browser = await puppeteer.connect({
+        browserWSEndpoint,
+      });
+    else {
+      browser = await puppeteer.launch({
+        defaultViewport: { width, height },
+        args: [`--window-size=${width},${height}`],
+        headless,
+      });
+      launchedBrowser = true;
+    }
   }
   if (!page) {
     page = await browser.newPage();
   }
 
-  const nb = new Notebook(browser, page);
+  const nb = new Notebook(browser, page, launchedBrowser);
   page.exposeFunction(
     "__OBSERVABLE_PRERENDER_BENCHMARK",
     (name, status, time) => {
@@ -220,7 +276,7 @@ async function load(notebook, targets = [], config = {}) {
 
   await page.waitForFunction(() => window.run);
 
-  await page.evaluate(
+  const result = await page.evaluate(
     async (notebook, targets, OBSERVABLEHQ_API_KEY, benchmark) =>
       window.run({
         notebook,
@@ -234,7 +290,17 @@ async function load(notebook, targets = [], config = {}) {
     benchmark
   );
 
+  if (result)
+    throw new ObservablePrerenderError(
+      `Error fetching the notebook ${notebook}. Ensure that the notebook is public or link shared, or pass in an API key with OBSERVABLEHQ_API_KEY.`,
+      { error: result }
+    );
   return nb;
 }
 
-module.exports = { load, DEFAULT_WIDTH, DEFAULT_HEIGHT };
+module.exports = {
+  load,
+  DEFAULT_WIDTH,
+  DEFAULT_HEIGHT,
+  ObservablePrerenderError,
+};

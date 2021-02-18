@@ -1,81 +1,97 @@
 #!/usr/bin/env node
 const { program } = require("commander");
+const { writeFileSync } = require("rw/lib/rw/dash");
 const { load } = require("../src");
+const {
+  consolidateFormat,
+  getNotebookConfig,
+  applyBrowserOptions,
+  applyRedefineOptions,
+} = require("./utils");
+const { join } = require("path");
 
 const validFormats = new Set(["json", "html"]);
 
-program
+let p = program
   .version(require("../package.json").version)
   .arguments("<notebook> <cells...>")
   .description("Benchmark an Observable notebook.")
-  .option(
-    "--no-headless",
-    "Turn off headless mode on the Puppeteer browser, meaning open the browser to the user."
-  )
-  .option("-f, --format [format]", "Type of output, json or html.", "json")
-  .action(function (argNotebook, argCells) {
-    const opts = program.opts();
-    const { headless, format } = opts;
-    if (!validFormats.has(format)) {
-      console.error(
-        `ERROR: "${format}" not valid input. Must be one of ${Array.from(
-          validFormats
-        ).join(", ")}`
-      );
-      process.exit(1);
-    }
+  .option("-o, --out [file]", "Output file path for the generated report.")
+  .option("-f, --format [format]", "Type of output, json or html.")
+  .option("-v, --verbose", "Print logs to follow progress.");
 
-    const config = {
-      headless,
-      benchmark: true,
+p = applyBrowserOptions(p);
+p = applyRedefineOptions(p);
+
+p.action(function (argNotebook, argCells) {
+  const opts = program.opts();
+  const { out, verbose } = opts;
+  let { format } = opts;
+  format = consolidateFormat(out, format, validFormats, "html");
+
+  const config = Object.assign(getNotebookConfig(opts), { benchmark: true });
+
+  if (verbose) console.log(`Loading ${argNotebook} with `, argCells);
+
+  load(argNotebook, argCells, config).then(async (notebook) => {
+    if (verbose)
+      console.log(`Loaded notebook, waiting for cells to resolve...`);
+
+    await Promise.all(argCells.map((cell) => notebook.value(cell)));
+
+    await notebook.page.waitForFunction(() => window.notebookModule);
+
+    if (verbose) console.log(`Cells resolved, retrieving metrics information.`);
+
+    const graph = await notebook.page.evaluate(() => {
+      const ignore = new Set(
+        window.notebookModule._runtime._builtin._scope.keys()
+      );
+      return Array.from(window.notebookModule._runtime._variables)
+        .filter(
+          (v) =>
+            !(
+              (v._inputs.length === 1 && v._module !== v._inputs[0]._module) // isimport
+            ) && v._reachable
+        )
+        .filter((v) => v._module !== window.notebookModule._runtime._builtin) // is builtin
+        .filter((v) => !ignore.has(v._name))
+        .map((v) => ({
+          name: v._name,
+          inputs: v._inputs.map((d) => d._name).filter((d) => !ignore.has(d)),
+        }));
+    });
+    const metrics = await notebook.page.metrics();
+    const benchmarkResults = {
+      notebook: argNotebook,
+      cells: argCells,
+      graph,
+      events: notebook.events,
+      metrics,
     };
 
-    load(argNotebook, argCells, config).then(async (notebook) => {
-      await Promise.all(argCells.map((cell) => notebook.value(cell)));
-      await notebook.page.waitForFunction(() => window.notebookModule);
-      const graph = await notebook.page.evaluate(() => {
-        const ignore = new Set(
-          window.notebookModule._runtime._builtin._scope.keys()
-        );
-        return Array.from(window.notebookModule._runtime._variables)
-          .filter(
-            (v) =>
-              !(
-                (v._inputs.length === 1 && v._module !== v._inputs[0]._module) // isimport
-              ) && v._reachable
-          )
-          .filter((v) => v._module !== window.notebookModule._runtime._builtin) // is builtin
-          .filter((v) => !ignore.has(v._name))
-          .map((v) => ({
-            name: v._name,
-            inputs: v._inputs.map((d) => d._name).filter((d) => !ignore.has(d)),
-          }));
+    let path;
+    if (format === "json") {
+      path = out || join(process.cwd(), `report.json`);
+      writeFileSync(path, JSON.stringify(benchmarkResults));
+    } else {
+      path = out || join(process.cwd(), "report.html");
+      if (verbose) console.log("Generating report...");
+      const resultsNotebook = await load("d/7dc9b816179869cc", ["all"], {
+        browser: notebook.browser,
       });
-      const metrics = await notebook.page.metrics();
-      const benchmarkResults = {
-        notebook: argNotebook,
-        cells: argCells,
-        graph,
-        events: notebook.events,
-        metrics,
-      };
-      switch (format) {
-        case "json":
-          console.log(JSON.stringify(benchmarkResults));
-          break;
-        case "html":
-          const resultsNotebook = await load("d/7dc9b816179869cc", ["all"], {
-            browser: notebook.browser,
-          });
-          await resultsNotebook.redefine(
-            "src",
-            JSON.stringify(benchmarkResults)
-          );
-          await resultsNotebook.html("all", "test.html");
-      }
+      await resultsNotebook.redefine("src", JSON.stringify(benchmarkResults));
+      await resultsNotebook.html("all", path);
+    }
+    if (verbose)
+      console.log(
+        `Benchmarking complete! Results ${
+          out === "-" ? "printed to stdout" : `saved to ${out}`
+        }`
+      );
 
-      await notebook.browser.close();
-    });
+    await notebook.close();
   });
+});
 
 program.parse(process.argv);

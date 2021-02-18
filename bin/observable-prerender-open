@@ -1,34 +1,35 @@
 #!/usr/bin/env node
 const { program } = require("commander");
-const { load, DEFAULT_WIDTH, DEFAULT_HEIGHT } = require("../src");
+const { load } = require("../src");
 
-program
+const {
+  applyBrowserOptions,
+  applyRedefineOptions,
+  getNotebookConfig,
+  runRedefines,
+} = require("./utils.js");
+
+let p = program
   .version(require("../package.json").version)
   .arguments("<notebook> [cells...]")
-  .description("Open an Observable notebook.")
-  .option(
-    "-w, --width <value>",
-    `Width of the Puppeteer browser. Default ${DEFAULT_WIDTH}`
-  )
-  .option(
-    "-h, --height <value>",
-    `Height of th Puppeteer browser. Default ${DEFAULT_HEIGHT}`
-  )
-  .action(async function (argNotebook, argCells) {
-    const opts = program.opts();
-
-    let { width, height } = opts;
-
-    if (width) width = +width;
-    if (height) height = +height;
-
-    const config = {
-      width,
-      height,
-      headless: false,
-    };
-
-    await load(argNotebook, argCells, config);
-  });
+  .description("Open an Observable notebook.");
+p = applyBrowserOptions(p);
+p = applyRedefineOptions(p);
+p.action(async function (argNotebook, argCells) {
+  const opts = program.opts();
+  const config = getNotebookConfig(opts);
+  console.log(config.headless);
+  config.headless = false;
+  load(argNotebook, argCells, config)
+    .then(async (notebook) => {
+      await runRedefines(notebook, opts, true);
+      console.log(`Notebook ${argNotebook} loaded.`);
+      console.log(notebook.browser.wsEndpoint());
+    })
+    .catch((error) => {
+      console.error(`Error caught when loading ${argNotebook} with`, argCells);
+      console.error(error);
+    });
+});
 
 program.parse(process.argv);

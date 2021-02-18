@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 const { program } = require("commander");
-const { load, DEFAULT_WIDTH, DEFAULT_HEIGHT } = require("../src");
-const {
-  parseArgRedefines,
-  parseArgRedefineFiles,
-  valueOfFile,
-} = require("./utils.js");
+const { load } = require("../src");
+const { applyBrowserOptions, applyRedefineOptions } = require("./utils.js");
 const { join } = require("path");
 
 function parseArgIter(iter) {
@@ -22,15 +18,10 @@ function parseArgIter(iter) {
   };
 }
 
-program
+let p = program
   .version(require("../package.json").version)
   .arguments("<notebook> [cells...]")
   .description("Pre-render an Observable notebook.")
-  .option("--redefine <cell:value...>", "Redefine a cell (string only)")
-  .option(
-    "--redefine-file <cell:<string,json,ndjson,csv>:value...>",
-    "Redefine a cell with a file"
-  )
   .requiredOption(
     "--iter <cell:cellIterator>",
     "The cell you want to iterate on, followed by the cell that contains the values that will be iterated through."
@@ -49,147 +40,71 @@ program
     "Specify a directory to save all the frames to.",
     process.cwd()
   )
-  .option(
-    "--token <token>",
-    "An observablehq.com API token to access the notebook."
-  )
-  .option(
-    "--no-headless",
-    "Turn off headless mode on the Puppeteer browser, meaning open the browser to the user."
-  )
-  .option(
-    "-w, --width <value>",
-    `Width of the Puppeteer browser. Default ${DEFAULT_WIDTH}`
-  )
-  .option(
-    "-h, --height <value>",
-    `Height of th Puppeteer browser. Default ${DEFAULT_HEIGHT}`
-  )
-  .option("-q, --quiet", "Don't print out logs")
-  .action(function (argNotebook, argCells) {
-    const opts = program.opts();
-    const {
-      version,
-      redefine = [],
-      redefineFile = [],
-      fileAttachments = [],
-      iter,
-      iterWaitfor = [],
-      outDir,
-      token,
-      headless,
-      quiet,
-    } = opts;
-    let width, height, format;
+  .option("-v, --verbose", "Print logs to follow progress.");
 
-    width = opts.width;
-    height = opts.height;
-    format = opts.format;
+p = applyBrowserOptions(p);
+p = applyRedefineOptions(p);
 
-    if (width) width = +width;
-    if (height) height = +height;
+p.action(function (argNotebook, argCells) {
+  const opts = program.opts();
+  const { iter, iterWaitfor = [], outDir, verbose } = opts;
+  let { format } = opts;
 
-    const iterIndex = Boolean(opts.iterIndex);
-    const argIter = parseArgIter(iter);
+  const iterIndex = Boolean(opts.iterIndex);
+  const argIter = parseArgIter(iter);
 
-    const redefines = parseArgRedefines(redefine);
-    const redefineFiles = parseArgRedefineFiles(redefineFile);
-    const redefineFileAttachments = parseArgRedefines(fileAttachments);
+  const embedCells = [...argCells, ...iterWaitfor];
 
-    const embedCells = [...argCells, ...iterWaitfor];
+  const notebookConfig = getNotebookConfig(opts);
 
-    const config = {
-      width,
-      height,
-      headless,
-    };
-    if (token) config["OBSERVABLEHQ_API_KEY"] = token;
+  if (verbose)
+    console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
 
-    if (!quiet)
-      console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
+  load(argNotebook, embedCells, notebookConfig).then(async (notebook) => {
+    await runRedefines(notebook, opts, verbose);
 
-    load(argNotebook, embedCells, config).then(async (notebook) => {
-      for (const { cell, value } of redefines) {
-        if (!quiet) console.log("Redefining ", cell, "with format ", format);
-        await notebook.redefine(cell, value);
-      }
+    // iterate through the cell
+    const iterableValues = await notebook.value(argIter.iterable);
 
-      for await (const {
-        cell,
-        value,
-        format: redefineFileFormat,
-      } of redefineFiles) {
-        if (!quiet)
-          console.log(
-            "Redefining ",
-            cell,
-            " with file ",
-            value,
-            " with format ",
-            redefineFileFormat
-          );
-        const data = await valueOfFile(value, redefineFileFormat);
-        notebook.redefine(cell, data);
-      }
+    const zeroPad = Array.from({
+      length: Math.ceil(Math.log(iterableValues.length) / Math.log(10)),
+    })
+      .map(() => "0")
+      .join("");
 
-      if (redefineFileAttachments.length > 0) {
-        const files = {};
-        for (const { cell, value } of redefineFileAttachments) {
-          if (!quiet)
-            console.log(
-              "Replacing FileAttachment ",
-              cell,
-              " with file ",
-              value
-            );
-          files[cell] = isAbsolute(value) ? value : join(process.cwd(), value);
-        }
+    for await (const [i, iterableValue] of iterableValues.entries()) {
+      if (verbose)
+        console.log(`[${i + 1}/${iterableValues.length}] Redefining`);
 
-        await notebook.fileAttachments(files);
-      }
+      if (iterIndex) await notebook.redefine(argIter.counter, i);
+      else await notebook.redefine(argIter.counter, iterableValue);
 
-      // iterate through the cell
-      const iterableValues = await notebook.value(argIter.iterable);
-
-      const zeroPad = Array.from({
-        length: Math.ceil(Math.log(iterableValues.length) / Math.log(10)),
-      })
-        .map(() => "0")
-        .join("");
-
-      for await (const [i, iterableValue] of iterableValues.entries()) {
-        if (!quiet)
-          console.log(`[${i + 1}/${iterableValues.length}] Redefining`);
-
-        if (iterIndex) await notebook.redefine(argIter.counter, i);
-        else await notebook.redefine(argIter.counter, iterableValue);
-
-        if (!quiet)
-          console.log(
-            `[${i + 1}/${iterableValues.length}] Waiting for`,
-            iterWaitfor
-          );
-        await Promise.all(iterWaitfor.map((cell) => notebook.waitFor(cell)));
-
-        await Promise.all(
-          argCells.map((cell) => {
-            if (!quiet)
-              console.log(
-                `[${i + 1}/${iterableValues.length}] Screenshotting`,
-                cell
-              );
-            const path = join(
-              outDir,
-              `${(zeroPad + i).slice(-zeroPad.length)}_${cell}.${format}`
-            );
-            if (format === "svg") return notebook.svg(cell, path);
-            return notebook.screenshot(cell, path, { type: format });
-          })
+      if (verbose)
+        console.log(
+          `[${i + 1}/${iterableValues.length}] Waiting for`,
+          iterWaitfor
         );
-      }
+      await Promise.all(iterWaitfor.map((cell) => notebook.waitFor(cell)));
 
-      notebook.browser.close();
-    });
+      await Promise.all(
+        argCells.map((cell) => {
+          if (verbose)
+            console.log(
+              `[${i + 1}/${iterableValues.length}] Screenshotting`,
+              cell
+            );
+          const path = join(
+            outDir,
+            `${(zeroPad + i).slice(-zeroPad.length)}_${cell}.${format}`
+          );
+          if (format === "svg") return notebook.svg(cell, path);
+          return notebook.screenshot(cell, path, { type: format });
+        })
+      );
+    }
+
+    notebook.close();
   });
+});
 
 program.parse(process.argv);
