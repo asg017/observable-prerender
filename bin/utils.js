@@ -116,7 +116,7 @@ function getNotebookConfig(opts) {
     headless,
     browserWSEndpoint: browserWsendpoint,
   };
-  console.log(config);
+
   if (token) config["OBSERVABLEHQ_API_KEY"] = token;
 
   return config;
