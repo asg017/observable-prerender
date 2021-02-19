@@ -36,6 +36,10 @@ let p = program
     "Output file path. Can only be used when one cell name is passed into 'cells'."
   )
   .option(
+    "--waitfor [cells...]",
+    "Extra cells to include in the document, but not save as a file (e.g. style cells, animation loops, etc.)."
+  )
+  .option(
     "--out-dir <directory>",
     "Specify a directory to save all the frames to."
   )
@@ -50,7 +54,7 @@ p = applyRedefineOptions(p);
 
 p.action(function (argNotebook, argCells) {
   const opts = program.opts();
-  const { out, outDir, verbose } = opts;
+  const { out, outDir, verbose, waitfor = [] } = opts;
   let { format } = opts;
 
   const notebookConfig = getNotebookConfig(opts);
@@ -68,13 +72,13 @@ p.action(function (argNotebook, argCells) {
   }
 
   format = consolidateFormat(out, format, formatOptions, "svg");
-
+  const cells = [...argCells, ...waitfor];
   if (verbose)
-    console.log(`Loading notebook "${argNotebook}" with cells `, argCells);
+    console.log(`Loading notebook "${argNotebook}" with cells `, cells);
 
-  load(argNotebook, argCells, notebookConfig).then(async (notebook) => {
+  load(argNotebook, cells, notebookConfig).then(async (notebook) => {
     await runRedefines(notebook, opts, verbose);
-
+    await Promise.all(waitfor.map((cell) => notebook.waitFor(cell)));
     await Promise.all(
       argCells.map(async (cell) => {
         const path = out
