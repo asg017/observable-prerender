@@ -27,26 +27,31 @@ bm_format() {
 bm_browser() {
     node start-headed-browser.js > headed_ws.tmp & 
     HEADED_PID=$!
+    sleep 3
     HEADED_WS=$(cat headed_ws.tmp)
 
     node start-headless-browser.js > headless_ws.tmp & 
     HEADLESS_PID=$!
+    sleep 3
     HEADLESS_WS=$(cat headless_ws.tmp)
 
+    echo $HEADED_PID $HEADED_WS 
+    echo $HEADLESS_PID $HEADLESS_WS 
+    echo $OUTDIR
     hyperfine --export-markdown browser.md \
-        "../bin/observable-prerender @d3/bar-chart chart -o $OUTDIR/bar-chart.svg" \ 
-        "../bin/observable-prerender @d3/bar-chart chart -o $OUTDIR/bar-chart.svg --browser-wsendpoint $HEADED_WS" \ 
-        "../bin/observable-prerender @d3/bar-chart chart -o $OUTDIR/bar-chart.svg --browser-wsendpoint $HEADLESS_WS"  
+        "../bin/observable-prerender @d3/bar-chart chart -o -" \
+        "../bin/observable-prerender @d3/bar-chart chart -o - --browser-wsendpoint $HEADED_WS" \
+        "../bin/observable-prerender @d3/bar-chart chart -o - --browser-wsendpoint $HEADLESS_WS"  
     
     kill $HEADED_PID $HEADLESS_PID
     
     rm headed_ws.tmp headless_ws.tmp
 }
 
-mb() {
+bm() {
     bm_basic
     bm_format
     bm_browser
 }
 
-bm_browser
+bm
